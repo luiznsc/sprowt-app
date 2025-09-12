@@ -19,7 +19,11 @@ export interface Aluno {
   id: string
   nome: string
   turma_id: string
+  data_nascimento: string
+  responsavel: string
+  telefone?: string
   observacoes?: string
+  relatorios_count: number
   created_at: string
 }
 
@@ -44,10 +48,14 @@ export const database = {
     return data
   },
 
-  async createTurma(turma: Omit<Turma, 'id' | 'created_at'>) {
+  async createTurma(turma: Omit<Turma, 'id' | 'created_at' | 'alunos_count'>) {
     const { data, error } = await supabase
       .from('turmas')
-      .insert(turma)
+      .insert({
+        nome: turma.nome,
+        faixa_etaria: turma.faixa_etaria,
+        cor: turma.cor
+      })
       .select()
       .single()
     
@@ -55,10 +63,15 @@ export const database = {
     return data
   },
 
-  async updateTurma(id: string, turma: Partial<Omit<Turma, 'id' | 'created_at'>>) {
+  async updateTurma(id: string, turma: Partial<Omit<Turma, 'id' | 'created_at' | 'alunos_count'>>) {
+    const updateData: any = {};
+    if (turma.nome) updateData.nome = turma.nome;
+    if (turma.faixa_etaria) updateData.faixa_etaria = turma.faixa_etaria;
+    if (turma.cor) updateData.cor = turma.cor;
+
     const { data, error } = await supabase
       .from('turmas')
-      .update(turma)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
@@ -88,10 +101,17 @@ export const database = {
     return data
   },
 
-  async createAluno(aluno: Omit<Aluno, 'id' | 'created_at'>) {
+  async createAluno(aluno: Omit<Aluno, 'id' | 'created_at' | 'relatorios_count'>) {
     const { data, error } = await supabase
       .from('alunos')
-      .insert(aluno)
+      .insert({
+        nome: aluno.nome,
+        turma_id: aluno.turma_id,
+        data_nascimento: aluno.data_nascimento,
+        responsavel: aluno.responsavel,
+        telefone: aluno.telefone,
+        observacoes: aluno.observacoes
+      })
       .select()
       .single()
     

@@ -50,13 +50,14 @@ interface RelatoriosManagerProps {
 import { useApp } from "@/context/use-app";
 
 export function RelatoriosManager() {
-  const { relatorios, alunos, loading, onRelatoriosChange, onAlunosChange, onRequestAI } = useApp();
+  const { relatorios, alunos, turmas, loading, onRelatoriosChange, onAlunosChange, onRequestAI } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [viewingRelatorio, setViewingRelatorio] = useState<Relatorio | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [filtroAluno, setFiltroAluno] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [filtroTurma, setFiltroTurma] = useState<string>("todas");
   const [formData, setFormData] = useState({
     alunoId: "",
     titulo: "",
@@ -139,21 +140,8 @@ export function RelatoriosManager() {
 
     setIsLoadingAI(true);
     try {
-      const prompt = `Gere um relatório de educação infantil para o aluno ${aluno.nome} (${aluno.idade} anos) da turma ${aluno.turma}.
-      
-Título: ${formData.titulo}
-Período: ${formData.periodo}
-${formData.observacoes ? `Observações específicas: ${formData.observacoes}` : ''}
-
-O relatório deve incluir:
-- Desenvolvimento cognitivo
-- Desenvolvimento social e emocional  
-- Desenvolvimento motor
-- Linguagem e comunicação
-- Participação em atividades
-- Relacionamento com colegas e professores
-
-Use linguagem positiva, construtiva e adequada para educação infantil. Seja específico mas carinhoso.`;
+      // Prompt simples - o Supabase vai adicionar o system prompt
+      const prompt = `Gere um relatório de educação infantil para ${aluno.nome}`;
 
       const conteudoIA = await onRequestAI(prompt, aluno.nome);
       
@@ -219,7 +207,8 @@ Use linguagem positiva, construtiva e adequada para educação infantil. Seja es
   const relatoriosFiltrados = relatorios.filter(relatorio => {
     const filtroAlunoOk = filtroAluno === "todos" || relatorio.alunoId === filtroAluno;
     const filtroStatusOk = filtroStatus === "todos" || relatorio.status === filtroStatus;
-    return filtroAlunoOk && filtroStatusOk;
+    const filtroTurmaOk = filtroTurma === "todas" || relatorio.turma === filtroTurma;
+    return filtroAlunoOk && filtroStatusOk && filtroTurmaOk;
   });
 
   const getInitials = (nome: string) => {
@@ -463,6 +452,22 @@ Use linguagem positiva, construtiva e adequada para educação infantil. Seja es
           </Select>
         </div>
         <div>
+          <Label htmlFor="filtro-turma">Filtrar por Turma</Label>
+          <Select value={filtroTurma} onValueChange={setFiltroTurma}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as turmas</SelectItem>
+              {turmas.map((turma) => (
+                <SelectItem key={turma.id} value={turma.nome}>
+                  {turma.nome} ({turma.faixaEtaria})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
           <Label htmlFor="filtro-status">Filtrar por Status</Label>
           <Select value={filtroStatus} onValueChange={setFiltroStatus}>
             <SelectTrigger className="w-40">
@@ -551,7 +556,7 @@ Use linguagem positiva, construtiva e adequada para educação infantil. Seja es
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              {filtroAluno === "todos" && filtroStatus === "todos" 
+              {filtroAluno === "todos" && filtroStatus === "todos" && filtroTurma === "todas"
                 ? "Nenhum relatório criado" 
                 : "Nenhum relatório encontrado"}
             </h3>

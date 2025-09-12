@@ -34,13 +34,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <header className="bg-white border-b border-border shadow-soft">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-primary rounded-lg p-2">
-                <BookOpen className="h-6 w-6 text-white" />
+            <div className="flex items-center gap-0">
+
+              <div className="bg-transparent rounded-lg p-2">
+                <img 
+                  src="https://owrqmsvokuwywzzdmnlk.supabase.co/storage/v1/object/public/assets/sprowt-logo2.png" 
+                  alt="Sprowt Logo" 
+                  className="h-12 w-12 object-contain"
+                  style={{ backgroundColor: 'transparent' }}
+                />
               </div>
+
               <div>
-                <h1 className="text-xl font-bold text-foreground">EduRelatos</h1>
-                <p className="text-xs text-muted-foreground">Sistema de Relatórios</p>
+                <h1 className="text-xl font-bold text-foreground">Sprowt</h1>
+                <p className="text-xs text-muted-foreground">Sistema de Gestão para Professoras</p>
               </div>
             </div>
             
@@ -54,10 +61,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => signOut()}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Sair
+                className="text-muted-foreground hover:bg-[#2E4E0E] hover:text-white">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
               </Button>
             </div>
           </div>

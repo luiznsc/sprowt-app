@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { database } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/use-auth";
 import { 
   Users, 
   FileText, 
@@ -16,6 +17,7 @@ import {
 
 export function DashboardHome() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [data, setData] = useState({
     turmas: [],
     alunos: [],
@@ -105,9 +107,11 @@ export function DashboardHome() {
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-gradient-primary rounded-xl p-6 text-white">
+        
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold mb-2">Olá, Professora! 👋</h2>
+
+            <h2 className="text-2xl font-bold mb-2">Olá, Professora {profile?.nome}! 👋</h2>
             <p className="text-white/90 text-lg">
               Bem-vinda ao seu sistema de relatórios. Vamos cuidar juntas do desenvolvimento dos pequenos!
             </p>
@@ -133,6 +137,7 @@ export function DashboardHome() {
           </div>
         </div>
       </div>
+
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
