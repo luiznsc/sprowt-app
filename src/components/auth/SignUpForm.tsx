@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, Link } from "react-router-dom";
+import { InputField } from "@/components/ui/inputField";
 
 export function SignUpForm() {
   const { signUp } = useAuth();
@@ -88,31 +89,23 @@ export function SignUpForm() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
+            <InputField
+              label="Nome Completo"
+              type="text"
+              value={formData.nome}
+              onChange={(value) => setFormData({ ...formData, nome: value })}
+              required
+              placeholder="Seu nome completo"
+            />
+            <InputField
+              label="E-mail"
+              type="email"
+              value={formData.email}
+              onChange={(value) => setFormData({ ...formData, email: value })}
+              required
+            />
             <div className="space-y-2">
-              <Label htmlFor="nome">Nome completo</Label>
-              <Input
-                id="nome"
-                placeholder="Digite seu nome completo"
-                className="bg-gray-200"
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu.email@escola.com"
-                className="bg-gray-200"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor="password">Senha<span className="text-red-500 ml-1">*</span></Label>
               <div className="relative">
                 <Input
                   id="password"

@@ -16,6 +16,7 @@ interface ChatMessage {
   metadata?: {
     aluno?: string;
     tipo?: string;
+    error?: boolean;
   };
 }
 
@@ -113,8 +114,7 @@ export function AssistenteIA() {
     );
   }
 
-  // Função simplificada para chamar a Edge Function
-  const chamarAssistenteIA = async (prompt: string, alunoNome?: string, tipo?: string, contexto?: string) => {
+   const chamarAssistenteIA = async (prompt: string, alunoNome?: string, tipo?: string, contexto?: string) => {
     try {
       // Pegar o token JWT da sessão atual
       const { data: { session } } = await supabase.auth.getSession();
@@ -122,6 +122,18 @@ export function AssistenteIA() {
       if (!session?.access_token) {
         throw new Error('Token de acesso não encontrado. Faça login novamente.');
       }
+
+      // Log de verificação (temporário)
+      console.log('has token?', Boolean(session.access_token));
+
+      console.log('🚀 Iniciando chamada para Gemini AI...', {
+        prompt: prompt.substring(0, 100) + '...',
+        tipo,
+        alunoNome,
+        hasContexto: !!contexto
+      });
+
+      console.log('Authorization header:', `Bearer ${session.access_token}`);
 
       // Tentar primeiro com supabase.functions.invoke
       try {
@@ -131,11 +143,15 @@ export function AssistenteIA() {
             alunoNome: alunoNome || null,
             tipo: tipo || 'conversa_livre',
             contexto: contexto || null
+          },
+          headers: { // Passando o token para a function invoke
+            'Authorization': `Bearer ${session.access_token}`
           }
         });
         
         if (error) {
-          throw new Error(error.message || 'Erro na chamada da função');
+          console.error('❌ Erro na função Supabase:', error);
+          throw new Error(`Erro na função Supabase: ${error.message || 'Erro desconhecido'}`);
         }
         
         if (!data) {
@@ -143,18 +159,29 @@ export function AssistenteIA() {
         }
 
         if (!data.success) {
-          throw new Error(data.error || 'Erro desconhecido na função');
+          console.error('❌ Função retornou erro:', data.error);
+          throw new Error(`Erro na função: ${data.error || 'Erro desconhecido'}`);
         }
+        
+        console.log('✅ Resposta recebida com sucesso:', {
+          responseLength: data.resposta?.length || 0,
+          model: data.metadata?.model
+        });
         
         return {
           resposta: data.resposta,
           metadata: data.metadata
         };
       } catch (corsError) {
-        console.log('🔄 Tentando com fetch direto devido a CORS...');
+        console.log('🔄 Tentando com fetch direto devido a CORS...', corsError);
         
         // Fallback: usar fetch direto com headers corretos
-        const response = await fetch('https://owrqmsvokuwywzzdmnlk.supabase.co/functions/v1/gemini-ai', {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (!supabaseUrl) {
+          throw new Error('URL do Supabase não configurada');
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/gemini-ai`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -171,24 +198,34 @@ export function AssistenteIA() {
 
         if (!response.ok) {
           const errorText = await response.text();
+          console.error('❌ Erro HTTP:', response.status, errorText);
           throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
         
         if (!data.success) {
-          throw new Error(data.error || 'Erro desconhecido na função');
+          console.error('❌ Resposta com erro:', data.error);
+          throw new Error(`Erro na resposta: ${data.error || 'Erro desconhecido'}`);
         }
+        
+        console.log('✅ Resposta recebida com sucesso:', {
+          responseLength: data.resposta?.length || 0,
+          model: data.metadata?.model
+        });
         
         return {
           resposta: data.resposta,
           metadata: data.metadata
         };
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Erro geral na chamada da IA:', error);
+      console.error('Detalhes do erro:', error);
       throw error;
     }
-  };
+  }; 
+
 
   const adicionarMensagem = (tipo: "usuario" | "assistente", conteudo: string, metadata?: any) => {
     const novaMensagem: ChatMessage = {
@@ -212,7 +249,14 @@ export function AssistenteIA() {
     }
 
     const aluno = alunos.find(a => a.id === alunoSelecionado);
-    if (!aluno) return;
+    if (!aluno) {
+      toast({
+        title: "Aluno não encontrado",
+        description: "O aluno selecionado não foi encontrado",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsLoading(true);
     adicionarMensagem("usuario", `Gerar relatório completo para ${aluno.nome}`, { aluno: aluno.nome });
@@ -229,9 +273,14 @@ export function AssistenteIA() {
 
       toast({
         title: "✅ Relatório gerado!",
-        description: "Relatório completo criado com sucesso"
+        description: `Relatório completo criado para ${aluno.nome}`
       });
     } catch (error: any) {
+      console.error('❌ Erro ao gerar relatório:', error);
+      
+      // Adicionar mensagem de erro no chat
+      adicionarMensagem("assistente", `❌ Erro ao gerar relatório: ${error.message} - Detalhes: ${JSON.stringify(error, null, 2)}`, { error: true });
+      
       toast({
         title: "❌ Erro ao gerar relatório",
         description: error.message || "Erro ao conectar com o assistente IA",
@@ -269,7 +318,17 @@ export function AssistenteIA() {
       adicionarMensagem("assistente", resultado.resposta, resultado.metadata);
       setPergunta("");
       
+      toast({
+        title: "✅ Resposta recebida!",
+        description: "O assistente IA respondeu sua pergunta"
+      });
+      
     } catch (error: any) {
+      console.error('❌ Erro ao processar pergunta:', error);
+      
+      // Adicionar mensagem de erro no chat
+      adicionarMensagem("assistente", `❌ Erro ao processar pergunta: ${error.message} - Detalhes: ${JSON.stringify(error, null, 2)}`, { error: true });
+      
       toast({
         title: "❌ Erro no Assistente IA",
         description: error.message || "Erro ao processar pergunta",
@@ -466,13 +525,21 @@ export function AssistenteIA() {
                       className={`max-w-[85%] p-4 rounded-lg text-sm relative group ${
                         msg.tipo === "usuario"
                           ? "bg-blue-600 text-white"
+                          : msg.metadata?.error
+                          ? "bg-red-50 border border-red-200 text-red-800"
                           : "bg-white border shadow-sm"
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        {msg.tipo === "assistente" && <Brain className="h-4 w-4 text-blue-600" />}
+                        {msg.tipo === "assistente" && (
+                          msg.metadata?.error ? (
+                            <div className="h-4 w-4 text-red-600">⚠️</div>
+                          ) : (
+                            <Brain className="h-4 w-4 text-blue-600" />
+                          )
+                        )}
                         <span className="font-medium text-xs opacity-70">
-                          {msg.tipo === "usuario" ? "Você" : "IA"}
+                          {msg.tipo === "usuario" ? "Você" : msg.metadata?.error ? "Erro" : "IA"}
                         </span>
                         <span className="text-xs opacity-50">
                           {new Date(msg.timestamp).toLocaleTimeString()}

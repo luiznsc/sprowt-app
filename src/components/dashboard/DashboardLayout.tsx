@@ -9,7 +9,8 @@ import {
   Home,
   Brain,
   LogOut,
-  Menu
+  Menu,
+  MessageSquare 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation, Outlet } from "react-router-dom";
@@ -24,6 +25,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     { path: "/", label: "Dashboard", icon: Home },
     { path: "/turmas", label: "Turmas", icon: Users },
     { path: "/alunos", label: "Alunos", icon: BookOpen },
+    { path: "/observacoes", label: "Alunos - Observações ", icon: MessageSquare },
     { path: "/relatorios", label: "Relatórios", icon: FileText },
     { path: "/ia", label: "Assistente IA", icon: Brain },
   ];
@@ -85,7 +87,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       className={cn(
                         "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-smooth",
                         location.pathname === item.path
-                          ? "bg-gradient-primary text-white hover:opacity-90"
+                          ? "bg-gradient-green-custom text-white hover:opacity-90"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       )}
                     >

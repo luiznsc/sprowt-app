@@ -3,7 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY devem estar definidas.");
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Tipos para as tabelas
 export interface Turma {
@@ -27,6 +31,40 @@ export interface Aluno {
   created_at: string
 }
 
+export interface ObservacaoAluno {
+  id: number;
+  id_aluno: string;
+  data_registro: string;
+  tipo_obs: TipoObservacao;
+  range_avaliacao: number;
+  obs: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TipoObservacao = 
+  | 'comportamental'
+  | 'cognitivo'
+  | 'motora'
+  | 'alimentacao'
+  | 'social'
+  | 'comunicacao'
+  | 'autonomia'
+  | 'rotina';
+
+export interface CreateObservacaoData {
+  id_aluno: string;
+  tipo_obs: TipoObservacao;
+  range_avaliacao: number;
+  obs: string;
+}
+
+export interface ObservacaoFormData {
+  tipo_obs: TipoObservacao;
+  range_avaliacao: number;
+  obs: string;
+}
+
 export interface Relatorio {
   id: string
   aluno_id: string
@@ -36,7 +74,7 @@ export interface Relatorio {
 }
 
 // Funções de acesso ao banco
-export const database = {
+const database = {
   // Turmas
   async getTurmas() {
     const { data, error } = await supabase
@@ -119,25 +157,212 @@ export const database = {
     return data
   },
 
-  // Relatórios
-  async getRelatorios() {
+
+  async deleteAluno(id: string) {
+    const { error } = await supabase
+      .from('alunos')
+      .delete()
+      .eq('id', id)
+    
+    if (error) throw error
+    return true
+  },
+
+
+  async getObservacoesByAluno(alunoId: string) {
     const { data, error } = await supabase
-      .from('relatorios')
+      .from('observacoes_aluno')
       .select('*')
-      .order('data', { ascending: false })
+      .eq('id_aluno', alunoId)
+      .order('data_registro', { ascending: false })
     
     if (error) throw error
     return data
   },
 
-  async createRelatorio(relatorio: Omit<Relatorio, 'id' | 'created_at'>) {
+  async createObservacao(observacao: CreateObservacaoData) {
     const { data, error } = await supabase
-      .from('relatorios')
-      .insert(relatorio)
+      .from('observacoes_aluno')
+      .insert([observacao])
       .select()
       .single()
     
     if (error) throw error
     return data
-  }
+  },
+
+  async updateObservacao(id: number, updates: Partial<CreateObservacaoData>) {
+    const { data, error } = await supabase
+      .from('observacoes_aluno')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  async deleteObservacao(id: number) {
+    const { error } = await supabase
+      .from('observacoes_aluno')
+      .delete()
+      .eq('id', id)
+    
+    if (error) throw error
+    return true
+  },
+
+
+  async getAllObservacoes() {
+    const { data, error } = await supabase
+      .from('observacoes_aluno')
+      .select(`
+        *,
+        alunos!id_aluno(nome, turma_id)
+      `)
+      .order('data_registro', { ascending: false })
+    
+    if (error) throw error
+    return data
+  },
+
+  // Functions avançadas usando as novas functions SQL
+  async getDashboardObservacoes() {
+    const { data, error } = await supabase
+      .from('dashboard_observacoes')
+      .select('*')
+    
+    if (error) throw error
+    return data || []
+  },
+
+  async getProgressoAluno(alunoId: string) {
+    const { data, error } = await supabase
+      .rpc('get_progresso_aluno', { aluno_uuid: alunoId })
+    
+    if (error) throw error
+    return data || []
+  },
+
+  async getMediaAvaliacaoAluno(alunoId: string) {
+    const { data, error } = await supabase
+      .rpc('get_aluno_media_avaliacao', { aluno_uuid: alunoId })
+    
+    if (error) throw error
+    return data || 0
+  },
+
+  async getObservacoesPeriodo(dataInicio: string, dataFim: string, alunoId?: string) {
+    const { data, error } = await supabase
+      .rpc('get_observacoes_periodo', {
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        aluno_uuid: alunoId || null
+      })
+    
+    if (error) throw error
+    return data || []
+  },
+
+  async getEstatisticasTurma(turmaId: string) {
+    const { data, error } = await supabase
+      .rpc('get_estatisticas_turma', { turma_uuid: turmaId })
+    
+    if (error) throw error
+    return data?.[0] || null
+  },
+
+  // Busca com texto completo
+  async searchObservacoes(searchTerm: string) {
+    const { data, error } = await supabase
+      .from('observacoes_aluno')
+      .select(`
+        *,
+        alunos!id_aluno(nome, turma_id)
+      `)
+      .textSearch('obs', searchTerm, {
+        type: 'websearch',
+        config: 'portuguese'
+      })
+      .order('data_registro', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  },
+
+  // Atualizar aluno com contador de observações
+  async updateAluno(id: string, aluno: Partial<Omit<Aluno, 'id' | 'created_at'>>) {
+    const { data, error } = await supabase
+      .from('alunos')
+      .update(aluno)
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+
+  // Relatórios
+  async getRelatorios() {
+    const { data, error } = await supabase
+      .from('relatorios')
+      .select('*')
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return data
+  },
+
+  async createRelatorio(relatorio: {
+    aluno_id: string;
+    titulo: string;
+    periodo: string;
+    conteudo: string;
+    observacoes: string;
+    status: 'rascunho' | 'concluido';
+    gerado_por_ia: boolean;
+  }) {
+    const { data, error } = await supabase
+      .from('relatorios')
+      .insert(relatorio)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async updateRelatorio(id: string, updates: {
+    titulo?: string;
+    periodo?: string;
+    conteudo?: string;
+    observacoes?: string;
+    status?: 'rascunho' | 'concluido';
+  }) {
+    const { data, error } = await supabase
+      .from('relatorios')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async deleteRelatorio(id: string) {
+    const { error } = await supabase
+      .from('relatorios')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+    return true
+  },
+
 }
+
+export { supabase, database };

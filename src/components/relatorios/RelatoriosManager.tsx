@@ -8,8 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, FileText, Edit2, Eye, Calendar, User, Sparkles, Loader2 } from "lucide-react";
+import { Plus, FileText, Edit2, Eye, Calendar, User, Sparkles, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { InputField } from "@/components/ui/InputField"; // ← CORRIGIDO: maiúscula
+import { database } from "@/lib/supabase"; // ← ADICIONADO
+import { useApp } from "@/context/use-app";
 
 interface Relatorio {
   id: string;
@@ -39,25 +42,19 @@ interface Aluno {
   relatoriosCount: number;
 }
 
-interface RelatoriosManagerProps {
-  relatorios: Relatorio[];
-  alunos: Aluno[];
-  onRelatoriosChange: (relatorios: Relatorio[]) => void;
-  onAlunosChange: (alunos: Aluno[]) => void;
-  onRequestAI: (prompt: string, alunoNome: string) => Promise<string>;
-}
-
-import { useApp } from "@/context/use-app";
-
 export function RelatoriosManager() {
   const { relatorios, alunos, turmas, loading, onRelatoriosChange, onAlunosChange, onRequestAI } = useApp();
+  
+  // ✅ ESTADOS CORRIGIDOS E ADICIONADOS
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false); // ← ADICIONADO
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [viewingRelatorio, setViewingRelatorio] = useState<Relatorio | null>(null);
+  const [editingRelatorio, setEditingRelatorio] = useState<Relatorio | null>(null); // ← ADICIONADO
   const [isLoadingAI, setIsLoadingAI] = useState(false);
-  const [filtroAluno, setFiltroAluno] = useState<string>("todos");
-  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-  const [filtroTurma, setFiltroTurma] = useState<string>("todas");
+  const [filtroAluno, setFiltroAluno] = useState("todos");
+  const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroTurma, setFiltroTurma] = useState("todas");
   const [formData, setFormData] = useState({
     alunoId: "",
     titulo: "",
@@ -66,6 +63,7 @@ export function RelatoriosManager() {
     observacoes: "",
     status: "rascunho" as "rascunho" | "concluido"
   });
+
   const { toast } = useToast();
 
   const resetForm = () => {
@@ -79,7 +77,8 @@ export function RelatoriosManager() {
     });
   };
 
-  const handleAdd = () => {
+  // ✅ CREATE - CORRIGIDO COM BANCO
+  const handleAdd = async () => { // ← ASYNC ADICIONADO
     if (!formData.alunoId || !formData.titulo || !formData.periodo) {
       toast({
         title: "Campos obrigatórios",
@@ -92,37 +91,152 @@ export function RelatoriosManager() {
     const aluno = alunos.find(a => a.id === formData.alunoId);
     if (!aluno) return;
 
-    const novoRelatorio: Relatorio = {
-      id: Date.now().toString(),
-      alunoId: formData.alunoId,
-      alunoNome: aluno.nome,
-      turma: aluno.turma,
-      titulo: formData.titulo,
-      periodo: formData.periodo,
-      conteudo: formData.conteudo,
-      observacoes: formData.observacoes,
-      status: formData.status,
-      criadoEm: new Date().toISOString(),
-      atualizadoEm: new Date().toISOString(),
-      geradoPorIA: false
-    };
+    try {
+      // ✅ SALVAR NO BANCO PRIMEIRO
+      const relatorioDb = await database.createRelatorio({
+        aluno_id: formData.alunoId,
+        titulo: formData.titulo,
+        periodo: formData.periodo,
+        conteudo: formData.conteudo,
+        observacoes: formData.observacoes,
+        status: formData.status,
+        gerado_por_ia: false
+      });
 
-    onRelatoriosChange([...relatorios, novoRelatorio]);
+      // ✅ TRANSFORMAR PARA FORMATO DO COMPONENTE
+      const novoRelatorio: Relatorio = {
+        id: relatorioDb.id,
+        alunoId: relatorioDb.aluno_id,
+        alunoNome: aluno.nome,
+        turma: aluno.turma,
+        titulo: relatorioDb.titulo,
+        periodo: relatorioDb.periodo,
+        conteudo: relatorioDb.conteudo,
+        observacoes: relatorioDb.observacoes,
+        status: relatorioDb.status,
+        criadoEm: relatorioDb.created_at,
+        atualizadoEm: relatorioDb.updated_at,
+        geradoPorIA: relatorioDb.gerado_por_ia
+      };
 
-    // Atualizar contador de relatórios do aluno
-    const alunosAtualizados = alunos.map(a =>
-      a.id === formData.alunoId
-        ? { ...a, relatoriosCount: a.relatoriosCount + 1 }
-        : a
-    );
-    onAlunosChange(alunosAtualizados);
+      onRelatoriosChange([...relatorios, novoRelatorio]);
 
-    setIsAddDialogOpen(false);
-    resetForm();
-    toast({
-      title: "Relatório criado!",
-      description: `Relatório para ${aluno.nome} foi criado com sucesso.`
+      // Atualizar contador do aluno
+      const alunosAtualizados = alunos.map(a =>
+        a.id === formData.alunoId
+          ? { ...a, relatoriosCount: a.relatoriosCount + 1 }
+          : a
+      );
+      onAlunosChange(alunosAtualizados);
+
+      setIsAddDialogOpen(false);
+      resetForm();
+
+      toast({
+        title: "Relatório criado!",
+        description: `Relatório para ${aluno.nome} foi salvo no banco.`
+      });
+
+    } catch (error) {
+      console.error('Erro ao criar relatório:', error);
+      toast({
+        title: "Erro ao criar",
+        description: "Não foi possível salvar o relatório",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // ✅ UPDATE - FUNÇÃO ADICIONADA
+  const handleEdit = async () => {
+    if (!editingRelatorio || !formData.titulo || !formData.periodo) return;
+
+    try {
+      const relatorioAtualizado = await database.updateRelatorio(editingRelatorio.id, {
+        titulo: formData.titulo,
+        periodo: formData.periodo,
+        conteudo: formData.conteudo,
+        observacoes: formData.observacoes,
+        status: formData.status
+      });
+
+      // Atualizar no estado
+      const relatoriosAtualizados = relatorios.map(rel =>
+        rel.id === editingRelatorio.id
+          ? { ...rel, 
+              titulo: relatorioAtualizado.titulo,
+              periodo: relatorioAtualizado.periodo,
+              conteudo: relatorioAtualizado.conteudo,
+              observacoes: relatorioAtualizado.observacoes,
+              status: relatorioAtualizado.status,
+              atualizadoEm: relatorioAtualizado.updated_at
+            }
+          : rel
+      );
+      onRelatoriosChange(relatoriosAtualizados);
+
+      setIsEditDialogOpen(false);
+      setEditingRelatorio(null);
+      resetForm();
+
+      toast({
+        title: "Relatório atualizado!",
+        description: "As alterações foram salvas no banco."
+      });
+
+    } catch (error) {
+      console.error('Erro ao atualizar relatório:', error);
+      toast({
+        title: "Erro ao atualizar",
+        description: "Não foi possível atualizar o relatório",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // ✅ DELETE - FUNÇÃO ADICIONADA
+  const handleDelete = async (relatorio: Relatorio) => {
+    try {
+      await database.deleteRelatorio(relatorio.id);
+
+      // Remover do estado
+      const relatoriosAtualizados = relatorios.filter(rel => rel.id !== relatorio.id);
+      onRelatoriosChange(relatoriosAtualizados);
+
+      // Atualizar contador do aluno
+      const alunosAtualizados = alunos.map(a =>
+        a.id === relatorio.alunoId
+          ? { ...a, relatoriosCount: a.relatoriosCount - 1 }
+          : a
+      );
+      onAlunosChange(alunosAtualizados);
+
+      toast({
+        title: "Relatório removido",
+        description: `Relatório "${relatorio.titulo}" foi deletado.`
+      });
+
+    } catch (error) {
+      console.error('Erro ao deletar relatório:', error);
+      toast({
+        title: "Erro ao remover",
+        description: "Não foi possível deletar o relatório",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const openEditDialog = (relatorio: Relatorio) => {
+    setEditingRelatorio(relatorio);
+    setFormData({
+      alunoId: relatorio.alunoId,
+      titulo: relatorio.titulo,
+      periodo: relatorio.periodo,
+      conteudo: relatorio.conteudo,
+      observacoes: relatorio.observacoes,
+      status: relatorio.status
     });
+    setIsEditDialogOpen(true);
   };
 
   const handleGerarComIA = async () => {
@@ -140,19 +254,17 @@ export function RelatoriosManager() {
 
     setIsLoadingAI(true);
     try {
-      // Prompt simples - o Supabase vai adicionar o system prompt
       const prompt = `Gere um relatório de educação infantil para ${aluno.nome}`;
-
       const conteudoIA = await onRequestAI(prompt, aluno.nome);
-      
-      setFormData(prev => ({ 
-        ...prev, 
-        conteudo: conteudoIA 
+
+      setFormData(prev => ({
+        ...prev,
+        conteudo: conteudoIA
       }));
 
       toast({
         title: "Relatório gerado com IA!",
-        description: "O conteúdo foi gerado automaticamente. Revise antes de salvar.",
+        description: "O conteúdo foi gerado automaticamente. Revise antes de salvar."
       });
     } catch (error) {
       toast({
@@ -165,43 +277,65 @@ export function RelatoriosManager() {
     }
   };
 
-  const handleSalvarComIA = () => {
+  // ✅ CREATE COM IA - CORRIGIDO COM BANCO
+  const handleSalvarComIA = async () => { // ← ASYNC ADICIONADO
     if (!formData.alunoId || !formData.titulo || !formData.periodo) return;
 
     const aluno = alunos.find(a => a.id === formData.alunoId);
     if (!aluno) return;
 
-    const novoRelatorio: Relatorio = {
-      id: Date.now().toString(),
-      alunoId: formData.alunoId,
-      alunoNome: aluno.nome,
-      turma: aluno.turma,
-      titulo: formData.titulo,
-      periodo: formData.periodo,
-      conteudo: formData.conteudo,
-      observacoes: formData.observacoes,
-      status: formData.status,
-      criadoEm: new Date().toISOString(),
-      atualizadoEm: new Date().toISOString(),
-      geradoPorIA: true
-    };
+    try {
+      const relatorioDb = await database.createRelatorio({
+        aluno_id: formData.alunoId,
+        titulo: formData.titulo,
+        periodo: formData.periodo,
+        conteudo: formData.conteudo,
+        observacoes: formData.observacoes,
+        status: formData.status,
+        gerado_por_ia: true // ← FLAG IA
+      });
 
-    onRelatoriosChange([...relatorios, novoRelatorio]);
+      const novoRelatorio: Relatorio = {
+        id: relatorioDb.id,
+        alunoId: relatorioDb.aluno_id,
+        alunoNome: aluno.nome,
+        turma: aluno.turma,
+        titulo: relatorioDb.titulo,
+        periodo: relatorioDb.periodo,
+        conteudo: relatorioDb.conteudo,
+        observacoes: relatorioDb.observacoes,
+        status: relatorioDb.status,
+        criadoEm: relatorioDb.created_at,
+        atualizadoEm: relatorioDb.updated_at,
+        geradoPorIA: relatorioDb.gerado_por_ia
+      };
 
-    // Atualizar contador de relatórios do aluno
-    const alunosAtualizados = alunos.map(a =>
-      a.id === formData.alunoId
-        ? { ...a, relatoriosCount: a.relatoriosCount + 1 }
-        : a
-    );
-    onAlunosChange(alunosAtualizados);
+      onRelatoriosChange([...relatorios, novoRelatorio]);
 
-    setIsAddDialogOpen(false);
-    resetForm();
-    toast({
-      title: "Relatório salvo!",
-      description: `Relatório gerado por IA para ${aluno.nome} foi salvo com sucesso.`
-    });
+      // Atualizar contador do aluno
+      const alunosAtualizados = alunos.map(a =>
+        a.id === formData.alunoId
+          ? { ...a, relatoriosCount: a.relatoriosCount + 1 }
+          : a
+      );
+      onAlunosChange(alunosAtualizados);
+
+      setIsAddDialogOpen(false);
+      resetForm();
+
+      toast({
+        title: "Relatório salvo!",
+        description: `Relatório IA para ${aluno.nome} foi salvo no banco.`
+      });
+
+    } catch (error) {
+      console.error('Erro ao salvar relatório IA:', error);
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar o relatório",
+        variant: "destructive"
+      });
+    }
   };
 
   const relatoriosFiltrados = relatorios.filter(relatorio => {
@@ -225,9 +359,11 @@ export function RelatoriosManager() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-muted-foreground">Carregando relatórios...</p>
+      <div className="flex items-center justify-center min-h-[200px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Carregando relatórios...</p>
+        </div>
       </div>
     );
   }
@@ -236,10 +372,9 @@ export function RelatoriosManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Relatórios</h2>
+          <h1 className="text-3xl font-bold tracking-tight">Relatórios</h1>
           <p className="text-muted-foreground">Gerencie os relatórios dos alunos</p>
         </div>
-        
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-primary hover:opacity-90 text-white">
@@ -247,7 +382,7 @@ export function RelatoriosManager() {
               Novo Relatório
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Criar Novo Relatório</DialogTitle>
               <DialogDescription>
@@ -255,80 +390,78 @@ export function RelatoriosManager() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="aluno">Aluno *</Label>
-                  <Select value={formData.alunoId} onValueChange={(value) => setFormData({ ...formData, alunoId: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o aluno" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {alunos.map((aluno) => (
-                        <SelectItem key={aluno.id} value={aluno.id}>
-                          {aluno.nome} - {aluno.turma}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value: "rascunho" | "concluido") => setFormData({ ...formData, status: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="rascunho">Rascunho</SelectItem>
-                      <SelectItem value="concluido">Concluído</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label htmlFor="aluno">Aluno<span className="text-red-500 ml-1">*</span></Label>
+                <Select value={formData.alunoId} onValueChange={(value) => setFormData({ ...formData, alunoId: value })}>
+                  <SelectTrigger className="bg-gray-200">
+                    <SelectValue placeholder="Selecione um aluno" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {alunos.map((aluno) => (
+                      <SelectItem key={aluno.id} value={aluno.id}>
+                        {aluno.nome} - {aluno.turma}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="titulo">Título *</Label>
-                  <Input
-                    id="titulo"
-                    placeholder="Ex: Relatório Mensal - Janeiro 2024"
-                    value={formData.titulo}
-                    onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="periodo">Período *</Label>
-                  <Input
-                    id="periodo"
-                    placeholder="Ex: Janeiro 2024"
-                    value={formData.periodo}
-                    onChange={(e) => setFormData({ ...formData, periodo: e.target.value })}
-                  />
-                </div>
+
+              <div>
+                <Label htmlFor="status">Status</Label>
+                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                  <SelectTrigger className="bg-gray-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="rascunho">Rascunho</SelectItem>
+                    <SelectItem value="concluido">Concluído</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              <InputField
+                label="Título"
+                type="text"
+                value={formData.titulo}
+                onChange={(value) => setFormData({ ...formData, titulo: value })}
+                required
+                placeholder="Ex: Relatório Mensal - Março 2024"
+              />
+
+              <InputField
+                label="Período"
+                type="text"
+                value={formData.periodo}
+                onChange={(value) => setFormData({ ...formData, periodo: value })}
+                required
+                placeholder="Ex: Março 2024 ou 1º Semestre"
+              />
 
               <div>
                 <Label htmlFor="observacoes">Observações Específicas</Label>
                 <Textarea
                   id="observacoes"
-                  placeholder="Observações sobre o comportamento, desenvolvimento ou situações específicas do aluno..."
+                  placeholder="Observações específicas..."
                   value={formData.observacoes}
                   onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
                   rows={3}
+                  className="bg-gray-200"
                 />
               </div>
 
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
                   <Label htmlFor="conteudo">Conteúdo do Relatório</Label>
                   <Button
                     type="button"
                     variant="outline"
+                    size="sm"
                     onClick={handleGerarComIA}
-                    disabled={isLoadingAI || !formData.alunoId || !formData.titulo || !formData.periodo}
-                    className="text-accent border-accent hover:bg-accent-light"
+                    disabled={isLoadingAI}
+                    className="ml-2"
                   >
                     {isLoadingAI ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : (
                       <Sparkles className="h-4 w-4 mr-2" />
                     )}
@@ -337,32 +470,28 @@ export function RelatoriosManager() {
                 </div>
                 <Textarea
                   id="conteudo"
-                  placeholder="Digite o conteúdo do relatório ou use a IA para gerar automaticamente..."
+                  placeholder="Digite o conteúdo do relatório..."
                   value={formData.conteudo}
                   onChange={(e) => setFormData({ ...formData, conteudo: e.target.value })}
                   rows={8}
-                  className="min-h-[200px]"
+                  className="min-h-[200px] bg-gray-200"
                 />
               </div>
             </div>
-            <DialogFooter className="gap-2">
+            <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancelar
               </Button>
               {formData.conteudo && formData.conteudo.length > 100 && (
                 <Button 
-                  onClick={handleSalvarComIA} 
-                  className="bg-gradient-accent hover:opacity-90 text-white"
+                  onClick={handleSalvarComIA}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
                   Salvar (Gerado por IA)
                 </Button>
               )}
-              <Button 
-                onClick={handleAdd} 
-                className="bg-gradient-primary hover:opacity-90 text-white"
-                disabled={!formData.conteudo}
-              >
+              <Button onClick={handleAdd} className="bg-gradient-primary hover:opacity-90 text-white">
                 Salvar Relatório
               </Button>
             </DialogFooter>
@@ -370,60 +499,142 @@ export function RelatoriosManager() {
         </Dialog>
       </div>
 
+      {/* ✅ MODAL DE EDITAR - ADICIONADO */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Relatório</DialogTitle>
+            <DialogDescription>
+              Edite as informações do relatório
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-aluno">Aluno<span className="text-red-500 ml-1">*</span></Label>
+              <Select value={formData.alunoId} onValueChange={(value) => setFormData({ ...formData, alunoId: value })}>
+                <SelectTrigger className="bg-gray-200">
+                  <SelectValue placeholder="Selecione um aluno" />
+                </SelectTrigger>
+                <SelectContent>
+                  {alunos.map((aluno) => (
+                    <SelectItem key={aluno.id} value={aluno.id}>
+                      {aluno.nome} - {aluno.turma}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-status">Status</Label>
+              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                <SelectTrigger className="bg-gray-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rascunho">Rascunho</SelectItem>
+                  <SelectItem value="concluido">Concluído</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <InputField
+              label="Título"
+              type="text"
+              value={formData.titulo}
+              onChange={(value) => setFormData({ ...formData, titulo: value })}
+              required
+              placeholder="Ex: Relatório Mensal - Março 2024"
+            />
+
+            <InputField
+              label="Período"
+              type="text"
+              value={formData.periodo}
+              onChange={(value) => setFormData({ ...formData, periodo: value })}
+              required
+              placeholder="Ex: Março 2024 ou 1º Semestre"
+            />
+
+            <div>
+              <Label htmlFor="edit-observacoes">Observações Específicas</Label>
+              <Textarea
+                id="edit-observacoes"
+                placeholder="Observações específicas..."
+                value={formData.observacoes}
+                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                rows={3}
+                className="bg-gray-200"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-conteudo">Conteúdo do Relatório</Label>
+              <Textarea
+                id="edit-conteudo"
+                placeholder="Digite o conteúdo do relatório..."
+                value={formData.conteudo}
+                onChange={(e) => setFormData({ ...formData, conteudo: e.target.value })}
+                rows={8}
+                className="min-h-[200px] bg-gray-200"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEdit} className="bg-gradient-primary hover:opacity-90 text-white">
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl">
           {viewingRelatorio && (
             <>
               <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <DialogTitle className="text-xl">{viewingRelatorio.titulo}</DialogTitle>
-                    <DialogDescription>
-                      {viewingRelatorio.alunoNome} - {viewingRelatorio.turma} - {viewingRelatorio.periodo}
-                    </DialogDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className={getStatusColor(viewingRelatorio.status)}>
-                      {getStatusText(viewingRelatorio.status)}
+                <DialogTitle>{viewingRelatorio.titulo}</DialogTitle>
+                <DialogDescription>
+                  {viewingRelatorio.alunoNome} - {viewingRelatorio.turma} - {viewingRelatorio.periodo}
+                </DialogDescription>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge className={getStatusColor(viewingRelatorio.status)}>
+                    {getStatusText(viewingRelatorio.status)}
+                  </Badge>
+                  {viewingRelatorio.geradoPorIA && (
+                    <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      IA
                     </Badge>
-                    {viewingRelatorio.geradoPorIA && (
-                      <Badge variant="outline" className="border-accent text-accent">
-                        <Sparkles className="h-3 w-3 mr-1" />
-                        IA
-                      </Badge>
-                    )}
-                  </div>
+                  )}
                 </div>
               </DialogHeader>
-              
               <div className="space-y-4">
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-2">Informações do Relatório</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Criado em:</span>
-                      <p>{new Date(viewingRelatorio.criadoEm).toLocaleDateString('pt-BR')}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Atualizado em:</span>
-                      <p>{new Date(viewingRelatorio.atualizadoEm).toLocaleDateString('pt-BR')}</p>
-                    </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <strong>Criado em:</strong>
+                    <p>{new Date(viewingRelatorio.criadoEm).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <strong>Atualizado em:</strong>
+                    <p>{new Date(viewingRelatorio.atualizadoEm).toLocaleDateString('pt-BR')}</p>
                   </div>
                 </div>
-
+                
                 {viewingRelatorio.observacoes && (
                   <div>
-                    <h4 className="font-semibold mb-2">Observações Específicas</h4>
-                    <div className="bg-secondary-light p-3 rounded-lg text-sm">
-                      {viewingRelatorio.observacoes}
-                    </div>
+                    <strong>Observações Específicas</strong>
+                    <p className="mt-2 p-3 bg-gray-50 rounded-lg">{viewingRelatorio.observacoes}</p>
                   </div>
                 )}
-
+                
                 <div>
-                  <h4 className="font-semibold mb-2">Conteúdo do Relatório</h4>
-                  <div className="bg-white border rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap">
+                  <strong>Conteúdo do Relatório</strong>
+                  <div className="mt-2 p-4 bg-gray-50 rounded-lg whitespace-pre-wrap">
                     {viewingRelatorio.conteudo}
                   </div>
                 </div>
@@ -434,11 +645,11 @@ export function RelatoriosManager() {
       </Dialog>
 
       {/* Filtros */}
-      <div className="flex gap-4">
-        <div>
+      <div className="flex flex-wrap gap-4">
+        <div className="min-w-[200px]">
           <Label htmlFor="filtro-aluno">Filtrar por Aluno</Label>
           <Select value={filtroAluno} onValueChange={setFiltroAluno}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="bg-gray-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -451,10 +662,11 @@ export function RelatoriosManager() {
             </SelectContent>
           </Select>
         </div>
-        <div>
+
+        <div className="min-w-[200px]">
           <Label htmlFor="filtro-turma">Filtrar por Turma</Label>
           <Select value={filtroTurma} onValueChange={setFiltroTurma}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="bg-gray-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -467,10 +679,11 @@ export function RelatoriosManager() {
             </SelectContent>
           </Select>
         </div>
-        <div>
+
+        <div className="min-w-[200px]">
           <Label htmlFor="filtro-status">Filtrar por Status</Label>
           <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="bg-gray-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -482,98 +695,116 @@ export function RelatoriosManager() {
         </div>
       </div>
 
-      {/* Relatórios Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* ✅ RELATÓRIOS GRID - CORRIGIDO COM BOTÕES CRUD */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {relatoriosFiltrados.map((relatorio) => (
-          <Card key={relatorio.id} className="bg-white shadow-soft hover:shadow-medium transition-smooth">
-            <CardHeader className="pb-4">
+          <Card key={relatorio.id} className="hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 bg-gradient-primary">
-                    <AvatarFallback className="bg-gradient-primary text-white font-semibold">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-gradient-primary text-white">
                       {getInitials(relatorio.alunoNome)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <CardTitle className="text-base leading-tight">{relatorio.titulo}</CardTitle>
-                    <CardDescription className="text-sm">
+                    <CardTitle className="text-lg line-clamp-1">{relatorio.titulo}</CardTitle>
+                    <CardDescription className="line-clamp-1">
                       {relatorio.alunoNome} - {relatorio.turma}
                     </CardDescription>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setViewingRelatorio(relatorio);
-                    setIsViewDialogOpen(true);
-                  }}
-                  className="h-8 w-8 p-0"
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
+                
+                {/* ✅ BOTÕES CRUD ADICIONADOS */}
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setViewingRelatorio(relatorio);
+                      setIsViewDialogOpen(true);
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openEditDialog(relatorio)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(relatorio)}
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
+            <CardContent className="pt-0">
+              <div className="flex items-center gap-2 mb-3">
                 <Badge className={getStatusColor(relatorio.status)}>
                   {getStatusText(relatorio.status)}
                 </Badge>
                 {relatorio.geradoPorIA && (
-                  <Badge variant="outline" className="border-accent text-accent">
+                  <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">
                     <Sparkles className="h-3 w-3 mr-1" />
                     IA
                   </Badge>
                 )}
               </div>
               
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">Período:</span>
-                  <span className="text-foreground font-medium">{relatorio.periodo}</span>
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <div className="flex items-center">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  Período: {relatorio.periodo}
                 </div>
-                
-                <div className="flex items-center gap-2">
-                  <FileText className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">Criado em:</span>
-                  <span className="text-foreground">{new Date(relatorio.criadoEm).toLocaleDateString('pt-BR')}</span>
+                <div>
+                  Criado em: {new Date(relatorio.criadoEm).toLocaleDateString('pt-BR')}
                 </div>
-                
-                {relatorio.conteudo && (
-                  <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                    {relatorio.conteudo.substring(0, 100)}...
-                  </div>
-                )}
               </div>
+              
+              {relatorio.conteudo && (
+                <p className="mt-3 text-sm text-muted-foreground line-clamp-3">
+                  {relatorio.conteudo.substring(0, 100)}...
+                </p>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
 
       {relatoriosFiltrados.length === 0 && (
-        <Card className="bg-muted/50 border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              {filtroAluno === "todos" && filtroStatus === "todos" && filtroTurma === "todas"
-                ? "Nenhum relatório criado" 
-                : "Nenhum relatório encontrado"}
-            </h3>
-            <p className="text-muted-foreground text-center mb-4">
-              {alunos.length === 0 
-                ? "Primeiro, você precisa cadastrar alunos para criar relatórios"
-                : "Comece criando seu primeiro relatório com ou sem ajuda da IA"
-              }
-            </p>
-            {alunos.length > 0 && (
-              <Button onClick={() => setIsAddDialogOpen(true)} className="bg-gradient-primary hover:opacity-90 text-white">
-                <Plus className="h-4 w-4 mr-2" />
-                Criar Primeiro Relatório
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+        <div className="text-center py-12">
+          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">
+            {filtroAluno === "todos" && filtroStatus === "todos" && filtroTurma === "todas"
+              ? "Nenhum relatório criado"
+              : "Nenhum relatório encontrado"}
+          </h3>
+          <p className="text-muted-foreground mb-6">
+            {alunos.length === 0
+              ? "Primeiro, você precisa cadastrar alunos para criar relatórios"
+              : "Comece criando seu primeiro relatório com ou sem ajuda da IA"}
+          </p>
+          {alunos.length > 0 && (
+            <Button 
+              onClick={() => setIsAddDialogOpen(true)} 
+              className="bg-gradient-primary hover:opacity-90 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Criar Primeiro Relatório
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

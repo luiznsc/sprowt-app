@@ -8,6 +8,7 @@ import { TurmasManager } from "@/components/turmas/TurmasManager";
 import { AlunosManager } from "@/components/alunos/AlunosManager";
 import { RelatoriosManager } from "@/components/relatorios/RelatoriosManager";
 import { AssistenteIA } from "@/components/ia/AssistenteIA";
+import { ObservacoesManager } from "@/components/alunos/ObservacaoAluno/ObservacoesManager";
 import { UnauthorizedPage } from "@/pages/UnauthorizedPage";
 import NotFound from "@/pages/NotFound";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -29,7 +30,9 @@ const router = createBrowserRouter([
     path: "/",
     element: (
       <ProtectedRoute>
-        <DashboardLayout />
+        <AppProvider>
+          <DashboardLayout />
+        </AppProvider>
       </ProtectedRoute>
     ),
     children: [
@@ -40,7 +43,7 @@ const router = createBrowserRouter([
       {
         path: "turmas",
         element: (
-          <ProtectedRoute allowedTypes={["admin", "professor"]}>
+          <ProtectedRoute>
             <TurmasManager />
           </ProtectedRoute>
         ),
@@ -48,15 +51,23 @@ const router = createBrowserRouter([
       {
         path: "alunos",
         element: (
-          <ProtectedRoute allowedTypes={["admin", "professor"]}>
+          <ProtectedRoute>
             <AlunosManager />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "observacoes",
+        element: (
+          <ProtectedRoute>
+            <ObservacoesManager />
           </ProtectedRoute>
         ),
       },
       {
         path: "relatorios",
         element: (
-          <ProtectedRoute allowedTypes={["admin", "professor"]}>
+          <ProtectedRoute>
             <RelatoriosManager />
           </ProtectedRoute>
         ),
@@ -64,7 +75,7 @@ const router = createBrowserRouter([
       {
         path: "ia",
         element: (
-          <ProtectedRoute allowedTypes={["admin", "professor"]}>
+          <ProtectedRoute>
             <AssistenteIA />
           </ProtectedRoute>
         ),
@@ -78,9 +89,5 @@ const router = createBrowserRouter([
 ]);
 
 export function Router() {
-  return (
-    <AppProvider>
-      <RouterProvider router={router} />
-    </AppProvider>
-  );
+  return <RouterProvider router={router} />;
 }

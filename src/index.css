@@ -5,6 +5,13 @@
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #d1d5db !important; /* gray-300 */
+}
 
 @layer base {
   :root {
@@ -48,12 +55,34 @@ All colors MUST be HSL.
     --input: 220 20% 95%;
     --ring: 200 100% 45%;
 
+    --emerald: 158 64% 52%;
+    --emerald-light: 158 64% 85%;
+    
+    --orange: 24 95% 53%;
+    --orange-light: 24 95% 85%;
+    
+    --cyan: 188 100% 42%;
+    --cyan-light: 188 100% 80%;
+    
+    --purple: 262 83% 58%;
+    --purple-light: 262 83% 85%;
+    
+    --rose: 351 83% 61%;
+    --rose-light: 351 83% 90%;
+
     /* Educational themed gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
     --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-light)));
     --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(var(--success-light)));
     --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-light)));
-    
+
+    --gradient-emerald: linear-gradient(135deg, hsl(var(--emerald)), hsl(var(--emerald-light)));
+    --gradient-orange: linear-gradient(135deg, hsl(var(--orange)), hsl(var(--orange-light)));
+    --gradient-cyan: linear-gradient(135deg, hsl(var(--cyan)), hsl(var(--cyan-light)));
+    --gradient-purple: linear-gradient(135deg, hsl(var(--purple)), hsl(var(--purple-light)));
+    --gradient-rose: linear-gradient(135deg, hsl(var(--rose)), hsl(var(--rose-light)));
+    --gradient-green-custom: linear-gradient(90deg, #1A2E1A, #2E4E0E);  
+
     /* Shadows */
     --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -126,8 +155,49 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --emerald: 158 64% 45%;
+    --emerald-light: 158 64% 25%;
+    
+    --orange: 24 95% 50%;
+    --orange-light: 24 95% 25%;
+    
+    --cyan: 188 100% 45%;
+    --cyan-light: 188 100% 25%;
+    
+    --purple: 262 83% 65%;
+    --purple-light: 262 83% 25%;
+    
+    --rose: 351 83% 58%;
+    --rose-light: 351 83% 25%;
   }
 }
+
+@layer utilities {
+  .bg-gradient-green-custom{
+    background: var(--gradient-green-custom);
+  }
+  .bg-gradient-emerald {
+    background: var(--gradient-emerald);
+  }
+  
+  .bg-gradient-orange {
+    background: var(--gradient-orange);
+  }
+  
+  .bg-gradient-cyan {
+    background: var(--gradient-cyan);
+  }
+  
+  .bg-gradient-purple {
+    background: var(--gradient-purple);
+  }
+  
+  .bg-gradient-rose {
+    background: var(--gradient-rose);
+  }
+}
+
 
 @layer base {
   * {

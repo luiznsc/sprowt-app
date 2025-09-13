@@ -12,7 +12,8 @@ import {
   Heart,
   Star,
   Brain,
-  Plus
+  Plus,
+  StickyNote
 } from "lucide-react";
 
 export function DashboardHome() {
@@ -21,19 +22,21 @@ export function DashboardHome() {
   const [data, setData] = useState({
     turmas: [],
     alunos: [],
-    relatorios: []
+    relatorios: [],
+    observacoes: []
   });
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [turmas, alunos, relatorios] = await Promise.all([
+        const [turmas, alunos, relatorios, observacoes] = await Promise.all([
           database.getTurmas(),
           database.getAlunos(),
-          database.getRelatorios()
+          database.getRelatorios(),
+          database.getAllObservacoes()
         ]);
 
-        setData({ turmas, alunos, relatorios });
+        setData({ turmas, alunos, relatorios, observacoes});
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
       }
@@ -56,11 +59,22 @@ export function DashboardHome() {
       title: "Total de Alunos",
       value: data.alunos.length.toString(),
       icon: BookOpen,
-      color: "bg-gradient-secondary",
+      color: "bg-gradient-rose",
       description: data.alunos.length > 0 
         ? "Distribuídos nas turmas" 
         : "Nenhum aluno cadastrado"
     },
+
+    {
+    title: "Observações Registradas",
+      value: data.observacoes.length.toString(),
+      icon: StickyNote, // ← Adicione import: MessageSquare
+      color: "bg-gradient-orange",
+      description: data.observacoes.length > 0 
+        ? `Média: ${(data.observacoes.reduce((acc, obs) => acc + obs.range_avaliacao, 0) / data.observacoes.length).toFixed(1)} estrelas`
+        : "Nenhuma observação registrada"
+    },
+
     {
       title: "Relatórios este Mês",
       value: data.relatorios.length.toString(),
@@ -85,14 +99,14 @@ export function DashboardHome() {
       description: "Criar relatório para um aluno",
       icon: Plus,
       action: () => navigate("/relatorios"),
-      color: "bg-gradient-primary"
+      color: "bg-gradient-success"
     },
     {
       title: "Gerenciar Turmas",
       description: "Organizar turmas e alunos",
       icon: Users,
       action: () => navigate("/turmas"),
-      color: "bg-gradient-secondary"
+      color: "bg-gradient-primary"
     },
     {
       title: "Assistente IA",
@@ -100,13 +114,20 @@ export function DashboardHome() {
       icon: Brain,
       action: () => navigate("/ia"),
       color: "bg-gradient-accent"
+    },
+    {
+      title: "Ver Observações",
+      description: "Todas observações dos alunos",
+      icon: StickyNote,
+      action: () => navigate("/observacoes"),
+      color: "bg-gradient-orange"
     }
   ];
 
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-gradient-primary rounded-xl p-6 text-white">
+      <div className="bg-gradient-green-custom rounded-xl p-6 text-white">
         
         <div className="flex items-center justify-between">
           <div>

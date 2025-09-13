@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Users, Edit2, Trash2, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { InputField } from "@/components/ui/inputField";
 
 interface Turma {
   id: string;
@@ -183,7 +184,7 @@ export function TurmasManager() {
         
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90 text-white">
+            <Button className="bg-blue-500 hover:bg-blue-450 hover:opacity-90 text-white">
               <Plus className="h-4 w-4 mr-2" />
               Nova Turma
             </Button>
@@ -196,19 +197,18 @@ export function TurmasManager() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="nome">Nome da Turma</Label>
-                <Input
-                  id="nome"
-                  placeholder="Ex: Maternal II"
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                />
-              </div>
+              <InputField
+                label="Nome da Turma"
+                type="text"
+                value={formData.nome}
+                onChange={(value) => setFormData({ ...formData, nome: value })}
+                required
+                placeholder="Digite o nome da turma"
+              />
               <div>
                 <Label htmlFor="faixa">Faixa Etária</Label>
                 <Select value={formData.faixaEtaria} onValueChange={(value) => setFormData({ ...formData, faixaEtaria: value })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-gray-200">
                     <SelectValue placeholder="Selecione a faixa etária" />
                   </SelectTrigger>
                   <SelectContent>
@@ -240,7 +240,7 @@ export function TurmasManager() {
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleAdd} className="bg-gradient-primary hover:opacity-90 text-white">
+              <Button onClick={handleAdd} className="bg-blue-500 hover:bg-blue-450 hover:opacity-90 text-white">
                 Criar Turma
               </Button>
             </DialogFooter>
@@ -258,14 +258,14 @@ export function TurmasManager() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-nome">Nome da Turma</Label>
-              <Input
-                id="edit-nome"
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-              />
-            </div>
+            <InputField
+              label="Nome da Turma"
+              type="text"
+              value={formData.nome}
+              onChange={(value) => setFormData({ ...formData, nome: value })}
+              required
+              placeholder="Digite o nome completo"
+            />
             <div>
               <Label htmlFor="edit-faixa">Faixa Etária</Label>
               <Select value={formData.faixaEtaria} onValueChange={(value) => setFormData({ ...formData, faixaEtaria: value })}>
@@ -368,7 +368,7 @@ export function TurmasManager() {
             <p className="text-muted-foreground text-center mb-4">
               Comece criando sua primeira turma para organizar os alunos
             </p>
-            <Button onClick={() => setIsAddDialogOpen(true)} className="bg-gradient-primary hover:opacity-90 text-white">
+            <Button onClick={() => setIsAddDialogOpen(true)} className="bg-primary-500 text-white hover:bg-primary-600">
               <Plus className="h-4 w-4 mr-2" />
               Criar Primeira Turma
             </Button>

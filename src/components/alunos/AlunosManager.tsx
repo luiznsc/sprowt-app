@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,8 +8,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, User, Edit2, Trash2, Calendar, FileText } from "lucide-react";
+import { Plus, User, Edit2, Trash2, Calendar, FileText, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useApp } from "@/context/use-app";
+import { InputField } from "@/components/ui/inputField";
+import { database } from "@/lib/supabase";
 
 interface Aluno {
   id: string;
@@ -21,6 +25,7 @@ interface Aluno {
   telefone: string;
   observacoes: string;
   relatoriosCount: number;
+  observacoes_count: number;
 }
 
 interface Turma {
@@ -38,14 +43,13 @@ interface AlunosManagerProps {
   onTurmasChange: (turmas: Turma[]) => void;
 }
 
-import { useApp } from "@/context/use-app";
-
 export function AlunosManager() {
+  const navigate = useNavigate();
   const { alunos, turmas, loading, onAlunosChange, onTurmasChange } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAluno, setEditingAluno] = useState<Aluno | null>(null);
-  const [filtroTurma, setFiltroTurma] = useState<string>("todas");
+  const [filtroTurma, setFiltroTurma] = useState("todas");
   const [formData, setFormData] = useState({
     nome: "",
     idade: "",
@@ -55,6 +59,7 @@ export function AlunosManager() {
     telefone: "",
     observacoes: ""
   });
+
   const { toast } = useToast();
 
   const resetForm = () => {
@@ -80,33 +85,47 @@ export function AlunosManager() {
     return idade;
   };
 
-  const handleAdd = () => {
-    if (!formData.nome || !formData.turmaId || !formData.dataNascimento || !formData.responsavel) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Preencha os campos obrigatórios",
-        variant: "destructive"
-      });
-      return;
-    }
+const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
+  if (!formData.nome || !formData.turmaId || !formData.dataNascimento || !formData.responsavel) {
+    toast({
+      title: "Campos obrigatórios",
+      description: "Preencha os campos obrigatórios",
+      variant: "destructive"
+    });
+    return;
+  }
 
+  try {
+    // Primeiro, criar o aluno no banco
+    const novoAlunoDb = await database.createAluno({
+      nome: formData.nome,
+      turma_id: formData.turmaId,
+      data_nascimento: formData.dataNascimento,
+      responsavel: formData.responsavel,
+      telefone: formData.telefone,
+      observacoes: formData.observacoes
+    });
+
+    // Encontrar dados da turma
     const turma = turmas.find(t => t.id === formData.turmaId);
     if (!turma) return;
 
-    const novoAluno: Aluno = {
-      id: Date.now().toString(),
-      nome: formData.nome,
-      idade: calcularIdade(formData.dataNascimento),
-      turmaId: formData.turmaId,
+    // Transformar para o formato usado no componente
+    const novoAluno = {
+      id: novoAlunoDb.id,
+      nome: novoAlunoDb.nome,
+      idade: calcularIdade(novoAlunoDb.data_nascimento),
+      turmaId: novoAlunoDb.turma_id,
       turma: turma.nome,
-      dataNascimento: formData.dataNascimento,
-      responsavel: formData.responsavel,
-      telefone: formData.telefone,
-      observacoes: formData.observacoes,
-      relatoriosCount: 0
+      dataNascimento: novoAlunoDb.data_nascimento,
+      responsavel: novoAlunoDb.responsavel,
+      telefone: novoAlunoDb.telefone || "",
+      observacoes: novoAlunoDb.observacoes || "",
+      relatoriosCount: 0,
+      observacoes_count: 0
     };
 
-    // Atualizar lista de alunos
+    // Atualizar lista de alunos no estado
     onAlunosChange([...alunos, novoAluno]);
 
     // Atualizar contador da turma
@@ -119,38 +138,63 @@ export function AlunosManager() {
 
     setIsAddDialogOpen(false);
     resetForm();
+    
     toast({
       title: "Aluno cadastrado!",
-      description: `${formData.nome} foi adicionado à turma ${turma.nome}.`
+      description: `${formData.nome} foi adicionado à turma ${turma.nome} e salvo no banco.`
     });
+    } catch (error) {
+      console.error('Erro ao salvar aluno:', error);
+      toast({
+        title: "Erro ao cadastrar",
+        description: "Não foi possível salvar o aluno no banco de dados",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleEdit = () => {
-    if (!editingAluno || !formData.nome || !formData.turmaId || !formData.dataNascimento || !formData.responsavel) return;
 
-    const turmaAnterior = editingAluno.turmaId;
-    const turmaAtual = formData.turmaId;
-    const turma = turmas.find(t => t.id === formData.turmaId);
-    if (!turma) return;
 
-    const alunoAtualizado: Aluno = {
-      ...editingAluno,
+ const handleEdit = async () => {  // ← ADICIONAR 'async' aqui também
+  if (!editingAluno || !formData.nome || !formData.turmaId || !formData.dataNascimento || !formData.responsavel) return;
+
+  try {
+    // Atualizar no banco primeiro
+    const alunoAtualizado = await database.updateAluno(editingAluno.id, {
       nome: formData.nome,
-      idade: calcularIdade(formData.dataNascimento),
-      turmaId: formData.turmaId,
-      turma: turma.nome,
-      dataNascimento: formData.dataNascimento,
+      turma_id: formData.turmaId,
+      data_nascimento: formData.dataNascimento,
       responsavel: formData.responsavel,
       telefone: formData.telefone,
       observacoes: formData.observacoes
+    });
+
+    const turma = turmas.find(t => t.id === formData.turmaId);
+    if (!turma) return;
+
+    // Transformar para formato do componente
+    const alunoFormatado = {
+      ...editingAluno,
+      nome: alunoAtualizado.nome,
+      idade: calcularIdade(alunoAtualizado.data_nascimento),
+      turmaId: alunoAtualizado.turma_id,
+      turma: turma.nome,
+      dataNascimento: alunoAtualizado.data_nascimento,
+      responsavel: alunoAtualizado.responsavel,
+      telefone: alunoAtualizado.telefone || "",
+      observacoes: alunoAtualizado.observacoes || ""
     };
 
+    // Atualizar no estado
     const alunosAtualizados = alunos.map(aluno =>
-      aluno.id === editingAluno.id ? alunoAtualizado : aluno
+      aluno.id === editingAluno.id ? alunoFormatado : aluno
     );
     onAlunosChange(alunosAtualizados);
 
     // Atualizar contadores das turmas se mudou de turma
+    const turmaAnterior = editingAluno.turmaId;
+    const turmaAtual = formData.turmaId;
+    
     if (turmaAnterior !== turmaAtual) {
       const turmasAtualizadas = turmas.map(t => {
         if (t.id === turmaAnterior) {
@@ -167,29 +211,51 @@ export function AlunosManager() {
     setIsEditDialogOpen(false);
     setEditingAluno(null);
     resetForm();
+    
     toast({
       title: "Aluno atualizado!",
-      description: "As alterações foram salvas com sucesso."
+      description: "As alterações foram salvas no banco de dados."
     });
+    } catch (error) {
+      console.error('Erro ao atualizar aluno:', error);
+      toast({
+        title: "Erro ao atualizar",
+        description: "Não foi possível atualizar o aluno",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleDelete = (aluno: Aluno) => {
-    const alunosAtualizados = alunos.filter(a => a.id !== aluno.id);
-    onAlunosChange(alunosAtualizados);
 
-    // Atualizar contador da turma
-    const turmasAtualizadas = turmas.map(t =>
-      t.id === aluno.turmaId
-        ? { ...t, alunosCount: t.alunosCount - 1 }
-        : t
-    );
-    onTurmasChange(turmasAtualizadas);
+  const handleDelete = async (aluno: Aluno) => { // ← Adicionar 'async'
+    try {
 
-    toast({
-      title: "Aluno removido",
-      description: `${aluno.nome} foi removido do sistema.`
-    });
+      await database.deleteAluno(aluno.id);
+
+      const alunosAtualizados = alunos.filter(a => a.id !== aluno.id);
+      onAlunosChange(alunosAtualizados);
+
+      const turmasAtualizadas = turmas.map(t =>
+        t.id === aluno.turmaId
+          ? { ...t, alunosCount: t.alunosCount - 1 }
+          : t
+      );
+      onTurmasChange(turmasAtualizadas);
+
+      toast({
+        title: "Aluno removido",
+        description: `${aluno.nome} foi removido do sistema e banco de dados.`
+      });
+    } catch (error) {
+      console.error('Erro ao deletar aluno:', error);
+      toast({
+        title: "Erro ao remover",
+        description: "Não foi possível remover o aluno do banco de dados",
+        variant: "destructive"
+      });
+    }
   };
+
 
   const openEditDialog = (aluno: Aluno) => {
     setEditingAluno(aluno);
@@ -226,13 +292,13 @@ export function AlunosManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Gerenciar Alunos</h2>
+          <h1 className="text-3xl font-bold text-foreground">Gerenciar Alunos</h1>
           <p className="text-muted-foreground">Cadastre e organize os alunos de suas turmas</p>
         </div>
         
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90 text-white">
+            <Button className="bg-rose-500 text-white hover:bg-rose-600">
               <Plus className="h-4 w-4 mr-2" />
               Novo Aluno
             </Button>
@@ -244,21 +310,20 @@ export function AlunosManager() {
                 Adicione um novo aluno ao sistema
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
+            <div className="space-y-4">
+              <InputField
+                label="Nome Completo"
+                type="text"
+                value={formData.nome}
+                onChange={(value) => setFormData({ ...formData, nome: value })}
+                required
+                placeholder="Digite o nome completo"
+              />
               <div>
-                <Label htmlFor="nome">Nome Completo *</Label>
-                <Input
-                  id="nome"
-                  placeholder="Ex: Ana Silva"
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="turma">Turma *</Label>
+                <Label htmlFor="turma">Turma<span className="text-red-500 ml-1 ">*</span></Label>
                 <Select value={formData.turmaId} onValueChange={(value) => setFormData({ ...formData, turmaId: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a turma" />
+                  <SelectTrigger className="bg-gray-200">
+                    <SelectValue placeholder="Selecione uma turma" />
                   </SelectTrigger>
                   <SelectContent>
                     {turmas.map((turma) => (
@@ -269,48 +334,44 @@ export function AlunosManager() {
                   </SelectContent>
                 </Select>
               </div>
+              
               <div>
-                <Label htmlFor="nascimento">Data de Nascimento *</Label>
+                <Label htmlFor="dataNascimento">Data de Nascimento<span className="text-red-500 ml-1">*</span></Label>
                 <Input
-                  id="nascimento"
+                  id="dataNascimento"
                   type="date"
+                  className="bg-gray-200 pr-10"
                   value={formData.dataNascimento}
-                  onChange={(e) => setFormData({ ...formData, dataNascimento: e.target.value })}
-                />
+                  onChange={(e) => setFormData({ ...formData, dataNascimento: e.target.value })}/>
               </div>
-              <div>
-                <Label htmlFor="responsavel">Responsável *</Label>
-                <Input
-                  id="responsavel"
-                  placeholder="Nome do responsável"
-                  value={formData.responsavel}
-                  onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="telefone">Telefone</Label>
-                <Input
-                  id="telefone"
-                  placeholder="(11) 99999-9999"
-                  value={formData.telefone}
-                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="observacoes">Observações</Label>
-                <Input
-                  id="observacoes"
-                  placeholder="Observações importantes"
-                  value={formData.observacoes}
-                  onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                />
-              </div>
+              
+              <InputField
+                label="Responsável"
+                type="text"
+                value={formData.responsavel}
+                onChange={(value) => setFormData({ ...formData, responsavel: value })}
+                required
+                placeholder="Nome do responsável"
+              />
+              <InputField
+                label="Telefone"
+                type="telefone"
+                value={formData.telefone}
+                onChange={(value) => setFormData({ ...formData, telefone: value })}
+              />
+              <InputField
+                label="Observações"
+                type="text"
+                value={formData.observacoes}
+                onChange={(value) => setFormData({ ...formData, observacoes: value })}
+                placeholder="Observações adicionais"
+              />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleAdd} className="bg-gradient-primary hover:opacity-90 text-white">
+              <Button onClick={handleAdd} className="bg-rose-500 text-white hover:bg-rose-600">
                 Cadastrar Aluno
               </Button>
             </DialogFooter>
@@ -327,15 +388,17 @@ export function AlunosManager() {
               Edite as informações do aluno
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-96 overflow-y-auto">
+          <div className="space-y-4">
             <div>
               <Label htmlFor="edit-nome">Nome Completo *</Label>
               <Input
                 id="edit-nome"
+                placeholder="Digite o nome completo"
                 value={formData.nome}
                 onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
               />
             </div>
+            
             <div>
               <Label htmlFor="edit-turma">Turma *</Label>
               <Select value={formData.turmaId} onValueChange={(value) => setFormData({ ...formData, turmaId: value })}>
@@ -351,35 +414,42 @@ export function AlunosManager() {
                 </SelectContent>
               </Select>
             </div>
+            
             <div>
-              <Label htmlFor="edit-nascimento">Data de Nascimento *</Label>
+              <Label htmlFor="edit-dataNascimento">Data de Nascimento *</Label>
               <Input
-                id="edit-nascimento"
+                id="edit-dataNascimento"
                 type="date"
                 value={formData.dataNascimento}
                 onChange={(e) => setFormData({ ...formData, dataNascimento: e.target.value })}
               />
             </div>
+            
             <div>
               <Label htmlFor="edit-responsavel">Responsável *</Label>
               <Input
                 id="edit-responsavel"
+                placeholder="Nome do responsável"
                 value={formData.responsavel}
                 onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
               />
             </div>
+            
             <div>
               <Label htmlFor="edit-telefone">Telefone</Label>
               <Input
                 id="edit-telefone"
+                placeholder="(11) 99999-9999"
                 value={formData.telefone}
                 onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
               />
             </div>
+            
             <div>
               <Label htmlFor="edit-observacoes">Observações</Label>
               <Input
                 id="edit-observacoes"
+                placeholder="Observações adicionais"
                 value={formData.observacoes}
                 onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
               />
@@ -397,11 +467,13 @@ export function AlunosManager() {
       </Dialog>
 
       {/* Filtros */}
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <Label htmlFor="filtro">Filtrar por Turma</Label>
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtrar por Turma</CardTitle>
+        </CardHeader>
+        <CardContent>
           <Select value={filtroTurma} onValueChange={setFiltroTurma}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full bg-gray-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -413,8 +485,8 @@ export function AlunosManager() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Alunos Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -423,8 +495,8 @@ export function AlunosManager() {
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 bg-gradient-primary">
-                    <AvatarFallback className="bg-gradient-primary text-white font-semibold">
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback className="bg-gradient-primary text-white text-sm font-semibold">
                       {getInitials(aluno.nome)}
                     </AvatarFallback>
                   </Avatar>
@@ -453,43 +525,50 @@ export function AlunosManager() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Badge variant="secondary" className="bg-muted">
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">
                   {aluno.turma}
                 </Badge>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <FileText className="h-3 w-3" />
-                  <span className="text-xs">{aluno.relatoriosCount} relatórios</span>
-                </div>
               </div>
               
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <User className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">Responsável:</span>
-                  <span className="text-foreground font-medium">{aluno.responsavel}</span>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <FileText className="h-3 w-3" />
+                <span className="text-xs">{aluno.relatoriosCount} relatórios</span>
+              </div>
+              
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <MessageSquare className="h-3 w-3" />
+                <span className="text-xs">{aluno.observacoes_count || 0} observações</span>
+              </div>
+              
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div>
+                  <strong>Responsável:</strong> {aluno.responsavel}
                 </div>
-                
                 {aluno.telefone && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">📞</span>
-                    <span className="text-foreground">{aluno.telefone}</span>
+                  <div>
+                    <strong>Telefone:</strong> {aluno.telefone}
                   </div>
                 )}
-                
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">Nascimento:</span>
-                  <span className="text-foreground">{new Date(aluno.dataNascimento).toLocaleDateString('pt-BR')}</span>
+                <div>
+                  <strong>Nascimento:</strong> {new Date(aluno.dataNascimento).toLocaleDateString('pt-BR')}
                 </div>
-                
                 {aluno.observacoes && (
-                  <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                  <div className="text-muted-foreground text-xs italic">
                     {aluno.observacoes}
                   </div>
                 )}
               </div>
+              
+              <Button
+                onClick={() => navigate(`/observacoes?aluno=${aluno.id}`)}
+                className="w-full mt-4"
+                variant="outline"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Ver Observações
+              </Button>
             </CardContent>
           </Card>
         ))}
@@ -503,13 +582,13 @@ export function AlunosManager() {
               {filtroTurma === "todas" ? "Nenhum aluno cadastrado" : "Nenhum aluno nesta turma"}
             </h3>
             <p className="text-muted-foreground text-center mb-4">
-              {turmas.length === 0 
+              {turmas.length === 0
                 ? "Primeiro, você precisa criar pelo menos uma turma"
                 : "Comece adicionando seus primeiros alunos"
               }
             </p>
             {turmas.length > 0 && (
-              <Button onClick={() => setIsAddDialogOpen(true)} className="bg-gradient-primary hover:opacity-90 text-white">
+              <Button onClick={() => setIsAddDialogOpen(true)} className="bg-rose-500 text-white hover:bg-rose-600">
                 <Plus className="h-4 w-4 mr-2" />
                 Cadastrar Primeiro Aluno
               </Button>
