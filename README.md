@@ -1,73 +1,86 @@
-# Welcome to your Lovable project
-
-## Project info
+# Sistema de Gerenciamento Escolar com Observações de Alunos
+## Projeto info
 
 **URL**: https://lovable.dev/projects/7c4cb84e-6a5b-4ae6-a5a2-d73d17c56b4e
 
-## How can I edit this code?
+## Visão Geral
 
-There are several ways of editing your application.
+Este projeto é um sistema de gerenciamento escolar desenvolvido com Vite, TypeScript, React, shadcn-ui e Tailwind CSS. Ele permite o cadastro e gerenciamento de alunos e turmas, além de oferecer funcionalidades para registrar observações sobre o desempenho e comportamento dos alunos. Essas observações são integradas ao processo de geração de relatórios, fornecendo insights valiosos para professores, coordenadores e famílias.
 
+## Funcionalidades Principais
+
+*   **Gerenciamento de Alunos:** Cadastre, edite e organize informações dos alunos.
+*   **Gerenciamento de Turmas:** Crie e gerencie turmas, definindo nomes, faixas etárias e cores.
+*   **Registro de Observações:** Professores podem registrar observações detalhadas sobre o comportamento e desempenho dos alunos, vinculando-as a datas específicas.
+*   **Histórico de Observações:** Visualize o histórico completo de observações de cada aluno.
+*   **Geração de Relatórios Inteligente:** Utilize a IA para gerar relatórios personalizados, incorporando as observações registradas, para fornecer insights abrangentes sobre o progresso do aluno.
+*   **Interface Moderna:** Design intuitivo e responsivo com shadcn-ui e Tailwind CSS.
+
+## Como posso editar este código?
+
+Existem várias maneiras de editar sua aplicação.
 **Use Lovable**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/7c4cb84e-6a5b-4ae6-a5a2-d73d17c56b4e) and start prompting.
+Simplesmente visite o [Projeto Lovable](https://lovable.dev/projects/7c4cb84e-6a5b-4ae6-a5a2-d73d17c56b4e) e comece a fazer prompts.
 
-Changes made via Lovable will be committed automatically to this repo.
+As alterações feitas via Lovable serão commitadas automaticamente para este repositório.
 
-**Use your preferred IDE**
+**Use seu IDE preferido**
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Se você deseja trabalhar localmente usando seu próprio IDE, você pode clonar este repositório e enviar as alterações. As alterações enviadas também serão refletidas no Lovable.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+O único requisito é ter Node.js & npm instalado - [instale com nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Follow these steps:
-
+Siga estes passos:
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Passo 1: Clone o repositório usando a URL Git do projeto.
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# Passo 2: Navegue até o diretório do projeto.
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
+# Passo 3: Instale as dependências necessárias.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Passo 4: Inicie o servidor de desenvolvimento com recarregamento automático e uma visualização instantânea.
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+**Edite um arquivo diretamente no GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
+- Navegue até os arquivos desejados.
+- Clique no botão "Editar" (ícone de lápis) na parte superior direita da visualização do arquivo.
+- Faça suas alterações e commite as alterações.
 **Use GitHub Codespaces**
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- Navegue até a página principal do seu repositório.
+- Clique no botão "Code" (botão verde) perto da parte superior direita.
+- Selecione a aba "Codespaces".
+- Clique em "Novo codespace" para iniciar um novo ambiente Codespace.
+- Edite os arquivos diretamente dentro do Codespace e faça commit e envie suas alterações quando terminar.
 
-## What technologies are used for this project?
+## Tecnologias Utilizadas
 
-This project is built with:
+*   [Vite](https://vitejs.dev/): Ferramenta de build extremamente rápida para desenvolvimento front-end.
+*   [TypeScript](https://www.typescriptlang.org/): Superset do JavaScript que adiciona tipagem estática.
+*   [React](https://reactjs.org/): Biblioteca JavaScript para construir interfaces de usuário.
+*   [shadcn-ui](https://ui.shadcn.com/): Conjunto de componentes reutilizáveis para React, construídos sobre Radix UI e Tailwind CSS.
+*   [Tailwind CSS](https://tailwindcss.com/): Framework CSS utilitário para design rápido e responsivo.
+*   [Supabase](https://supabase.com/): Backend como serviço para autenticação e banco de dados.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Como posso implantar este projeto?
 
-## How can I deploy this project?
+Simplesmente abra [Lovable](https://lovable.dev/projects/7c4cb84e-6a5b-4ae6-a5a2-d73d17c56b4e) e clique em Share -> Publish.
 
-Simply open [Lovable](https://lovable.dev/projects/7c4cb84e-6a5b-4ae6-a5a2-d73d17c56b4e) and click on Share -> Publish.
+## Posso conectar um domínio personalizado ao meu projeto Lovable?
 
-## Can I connect a custom domain to my Lovable project?
+Sim, você pode!
 
-Yes, you can!
+Para conectar um domínio, navegue até Projeto > Configurações > Domínios e clique em Conectar Domínio.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Leia mais aqui: [Configurando um domínio personalizado](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## Licença
+
+Este projeto é licenciado sob a [MIT License](LICENSE).
+
