@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { InputField } from "@/components/ui/inputField";
+import { InputField } from "@/components/ui/InputField";
 
 export function LoginForm() {
   const { signIn } = useAuth();

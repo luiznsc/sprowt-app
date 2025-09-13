@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, Link } from "react-router-dom";
-import { InputField } from "@/components/ui/inputField";
+import { InputField } from "@/components/ui/InputField";
 
 export function SignUpForm() {
   const { signUp } = useAuth();

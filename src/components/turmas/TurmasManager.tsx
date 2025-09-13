@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Users, Edit2, Trash2, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { InputField } from "@/components/ui/inputField";
+import { InputField } from "@/components/ui/InputField";
 
 interface Turma {
   id: string;

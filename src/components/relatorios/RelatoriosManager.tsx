@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -10,8 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Plus, FileText, Edit2, Eye, Calendar, User, Sparkles, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { InputField } from "@/components/ui/InputField"; // ← CORRIGIDO: maiúscula
-import { database } from "@/lib/supabase"; // ← ADICIONADO
+import { InputField } from "@/components/ui/InputField";
+import { database } from "@/lib/supabase"; 
 import { useApp } from "@/context/use-app";
 
 interface Relatorio {
