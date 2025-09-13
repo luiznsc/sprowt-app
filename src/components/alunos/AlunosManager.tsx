@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Plus, User, Edit2, Trash2, Calendar, FileText, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/context/use-app";
-import { InputField } from "@/components/ui/inputField";
+import { InputField } from "@/components/ui/InputField";
 import { database } from "@/lib/supabase";
 
 interface Aluno {
