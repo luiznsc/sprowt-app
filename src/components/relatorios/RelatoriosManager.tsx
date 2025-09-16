@@ -478,7 +478,7 @@ export function RelatoriosManager() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button variant="cancel" onClick={() => setIsAddDialogOpen(false)}>
                 Cancelar
               </Button>
               {formData.conteudo && formData.conteudo.length > 100 && (
@@ -580,7 +580,7 @@ export function RelatoriosManager() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button variant="cancel" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
             <Button onClick={handleEdit} className="bg-gradient-primary hover:opacity-90 text-white">

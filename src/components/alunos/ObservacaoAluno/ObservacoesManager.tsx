@@ -283,7 +283,7 @@ export function ObservacoesManager() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button variant="cancel" onClick={() => setIsAddDialogOpen(false)}>
                 Cancelar
               </Button>
               <Button onClick={handleAdd} className="bg-orange-500 text-white hover:bg-orange-600">

@@ -174,8 +174,7 @@ export function TurmasManager() {
       const novaTurma = await database.createTurma({
         nome: formData.nome,
         faixa_etaria: formData.faixaEtaria,
-        cor: formData.cor,
-        alunos_count: 0
+        cor: formData.cor
       });
 
       setTurmas([...turmas, novaTurma]);
@@ -337,7 +336,7 @@ export function TurmasManager() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button variant="cancel" onClick={() => setIsAddDialogOpen(false)}>
                 Cancelar
               </Button>
               <Button onClick={handleAdd}>
@@ -400,7 +399,7 @@ export function TurmasManager() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button variant="cancel" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
             <Button onClick={handleEdit}>

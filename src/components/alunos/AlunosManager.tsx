@@ -368,7 +368,7 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button variant="cancel" onClick={() => setIsAddDialogOpen(false)}>
                 Cancelar
               </Button>
               <Button onClick={handleAdd} className="bg-rose-500 text-white hover:bg-rose-600">
@@ -456,7 +456,7 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button variant="cancel" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
             <Button onClick={handleEdit} className="bg-gradient-primary hover:opacity-90 text-white">
