@@ -9,13 +9,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Tipos para as tabelas
+// ============================================
+// TIPOS ATUALIZADOS COM PROFESSOR_ID
+// ============================================
+
 export interface Turma {
   id: string
   nome: string
   faixa_etaria: string
   cor: string
   alunos_count: number
+  professor_id: string  // ✅ OBRIGATÓRIO
   created_at: string
 }
 
@@ -28,6 +32,7 @@ export interface Aluno {
   telefone?: string
   observacoes?: string
   relatorios_count: number
+  professor_id: string  // ✅ OBRIGATÓRIO
   created_at: string
 }
 
@@ -38,11 +43,12 @@ export interface ObservacaoAluno {
   tipo_obs: TipoObservacao;
   range_avaliacao: number;
   obs: string;
+  professor_id: string;  // ✅ OBRIGATÓRIO
   created_at: string;
   updated_at: string;
 }
 
-export type TipoObservacao = 
+export type TipoObservacao =
   | 'comportamental'
   | 'cognitivo'
   | 'motora'
@@ -59,117 +65,429 @@ export interface CreateObservacaoData {
   obs: string;
 }
 
-export interface ObservacaoFormData {
-  tipo_obs: TipoObservacao;
-  range_avaliacao: number;
-  obs: string;
-}
-
 export interface Relatorio {
   id: string
   aluno_id: string
+  titulo: string
+  periodo: string
   conteudo: string
+  observacoes: string
+  status: 'rascunho' | 'concluido'
+  gerado_por_ia: boolean
+  professor_id: string  // ✅ OBRIGATÓRIO
   data: string
   created_at: string
 }
 
+export interface UserProfile {
+  id: string;
+  nome: string;
+  tipo: 'admin' | 'professor';
+  created_at: string;
+}
+
 // ============================================
-// FUNÇÕES DE ACESSO AO BANCO - COMPLETAS
+// HELPERS GENÉRICOS PARA REDUZIR REPETIÇÃO
 // ============================================
 
-const database = {
-
-  // ============================================
-  // FUNÇÕES DE AUTENTICAÇÃO E VALIDAÇÃO
-  // ============================================
-
-  async getCurrentUser() {
+class DatabaseHelper {
+  // ✅ HELPER 1: Obter usuário atual com validação
+  private async getCurrentUser() {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw new Error(`Erro de autenticação: ${error.message}`);
     if (!user) throw new Error('Usuário não autenticado');
     return user;
-  },
+  }
 
-  async getUserProfile(userId: string) {
+  // ✅ HELPER 2: Obter profile do usuário
+  private async getUserProfile(userId: string): Promise<UserProfile> {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
-    
     if (error) throw new Error(`Erro ao buscar perfil: ${error.message}`);
     return data;
-  },
+  }
+
+  // ✅ HELPER 3: Determinar professor_id com validação de permissões
+  private async determineProfessorId(forProfessorId?: string): Promise<string> {
+    const user = await this.getCurrentUser();
+    const profile = await this.getUserProfile(user.id);
+    
+    if (profile.tipo === 'admin') {
+      // Admin pode criar para qualquer professor (ou para si mesmo)
+      return forProfessorId || user.id;
+    }
+    
+    if (profile.tipo === 'professor') {
+      // Professor só pode criar para si mesmo
+      if (forProfessorId && forProfessorId !== user.id) {
+        throw new Error('Professores só podem criar dados para si mesmos');
+      }
+      return user.id;
+    }
+    
+    throw new Error('Tipo de usuário não autorizado');
+  }
+
+  // ✅ HELPER 4: Validar permissões para operações
+  private async validatePermissions(): Promise<{ user: any, profile: UserProfile }> {
+    const user = await this.getCurrentUser();
+    const profile = await this.getUserProfile(user.id);
+    
+    if (!['admin', 'professor'].includes(profile.tipo)) {
+      throw new Error('Permissão negada. Apenas professores e administradores podem realizar esta operação.');
+    }
+    
+    return { user, profile };
+  }
 
   // ============================================
-  // TURMAS - FUNÇÕES ORIGINAIS + VALIDAÇÃO
+  // TURMAS - CRUD COMPLETO COM VALIDAÇÕES
   // ============================================
 
   async getTurmas() {
+    await this.validatePermissions(); // ✅ Validar antes de buscar
+    
     const { data, error } = await supabase
       .from('turmas')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false });
     
-    if (error) throw error
-    return data
-  },
+    if (error) throw error;
+    return data;
+  }
 
-  async createTurma(turma: Omit<Turma, 'id' | 'created_at' | 'alunos_count'>) {
+  async getTurma(turmaId: string) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('turmas')
+      .select('*')
+      .eq('id', turmaId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async createTurma(turma: Omit<Turma, 'id' | 'created_at' | 'alunos_count' | 'professor_id'>, forProfessorId?: string) {
+    const professorId = await this.determineProfessorId(forProfessorId);
+
     const { data, error } = await supabase
       .from('turmas')
       .insert({
         nome: turma.nome,
         faixa_etaria: turma.faixa_etaria,
-        cor: turma.cor
+        cor: turma.cor,
+        professor_id: professorId
       })
       .select()
-      .single()
-    
-    if (error) throw error
-    return data
-  },
+      .single();
 
-  async updateTurma(id: string, turma: Partial<Omit<Turma, 'id' | 'created_at' | 'alunos_count'>>) {
+    if (error) throw error;
+    return data;
+  }
+
+  async updateTurma(turmaId: string, updates: Partial<Omit<Turma, 'id' | 'created_at' | 'alunos_count' | 'professor_id'>>) {
+    await this.validatePermissions();
+    
     const updateData: any = {};
-    if (turma.nome) updateData.nome = turma.nome;
-    if (turma.faixa_etaria) updateData.faixa_etaria = turma.faixa_etaria;
-    if (turma.cor) updateData.cor = turma.cor;
+    if (updates.nome) updateData.nome = updates.nome;
+    if (updates.faixa_etaria) updateData.faixa_etaria = updates.faixa_etaria;
+    if (updates.cor) updateData.cor = updates.cor;
 
     const { data, error } = await supabase
       .from('turmas')
       .update(updateData)
-      .eq('id', id)
+      .eq('id', turmaId)
       .select()
-      .single()
-    
-    if (error) throw error
-    return data
-  },
+      .single();
 
-  // FUNÇÃO ORIGINAL (SEM VALIDAÇÃO) - MANTIDA PARA COMPATIBILIDADE
-  async deleteTurma(id: string) {
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteTurma(turmaId: string) {
+    await this.validatePermissions();
+    
     const { error } = await supabase
       .from('turmas')
       .delete()
-      .eq('id', id)
+      .eq('id', turmaId);
     
-    if (error) throw error
-    return true
-  },
+    if (error) throw error;
+    return true;
+  }
 
-  // NOVA FUNÇÃO COM VALIDAÇÃO - PROFESSOR OU ADMIN PODEM DELETAR
+  // ============================================
+  // ALUNOS - CRUD COMPLETO COM VALIDAÇÕES
+  // ============================================
+
+  async getAlunos() {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('alunos')
+      .select('*')
+      .order('nome');
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async getAluno(alunoId: string) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('alunos')
+      .select('*')
+      .eq('id', alunoId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async getAlunosByTurma(turmaId: string) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('alunos')
+      .select('*')
+      .eq('turma_id', turmaId)
+      .order('nome');
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async createAluno(aluno: Omit<Aluno, 'id' | 'created_at' | 'relatorios_count' | 'professor_id'>, forProfessorId?: string) {
+    const professorId = await this.determineProfessorId(forProfessorId);
+
+    const { data, error } = await supabase
+      .from('alunos')
+      .insert({
+        nome: aluno.nome,
+        turma_id: aluno.turma_id,
+        data_nascimento: aluno.data_nascimento,
+        responsavel: aluno.responsavel,
+        telefone: aluno.telefone,
+        observacoes: aluno.observacoes,
+        professor_id: professorId
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async updateAluno(alunoId: string, updates: Partial<Omit<Aluno, 'id' | 'created_at' | 'professor_id'>>) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('alunos')
+      .update(updates)
+      .eq('id', alunoId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteAluno(alunoId: string) {
+    await this.validatePermissions();
+    
+    const { error } = await supabase
+      .from('alunos')
+      .delete()
+      .eq('id', alunoId);
+    
+    if (error) throw error;
+    return true;
+  }
+
+  // ============================================
+  // OBSERVAÇÕES - CRUD COMPLETO COM VALIDAÇÕES
+  // ============================================
+
+  async getAllObservacoes() {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('observacoes_aluno')
+      .select(`
+        *,
+        alunos!id_aluno(nome, turma_id)
+      `)
+      .order('data_registro', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async getObservacao(observacaoId: number) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('observacoes_aluno')
+      .select('*')
+      .eq('id', observacaoId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async getObservacoesByAluno(alunoId: string) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('observacoes_aluno')
+      .select('*')
+      .eq('id_aluno', alunoId)
+      .order('data_registro', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async createObservacao(observacao: CreateObservacaoData, forProfessorId?: string) {
+    const professorId = await this.determineProfessorId(forProfessorId);
+
+    const { data, error } = await supabase
+      .from('observacoes_aluno')
+      .insert({
+        ...observacao,
+        professor_id: professorId
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async updateObservacao(observacaoId: number, updates: Partial<CreateObservacaoData>) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('observacoes_aluno')
+      .update(updates)
+      .eq('id', observacaoId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteObservacao(observacaoId: number) {
+    await this.validatePermissions();
+    
+    const { error } = await supabase
+      .from('observacoes_aluno')
+      .delete()
+      .eq('id', observacaoId);
+    
+    if (error) throw error;
+    return true;
+  }
+
+  // ============================================
+  // RELATÓRIOS - CRUD COMPLETO COM VALIDAÇÕES
+  // ============================================
+
+  async getRelatorios() {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('relatorios')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async getRelatorio(relatorioId: string) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('relatorios')
+      .select('*')
+      .eq('id', relatorioId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async getRelatoriosByAluno(alunoId: string) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('relatorios')
+      .select('*')
+      .eq('aluno_id', alunoId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async createRelatorio(relatorio: Omit<Relatorio, 'id' | 'created_at' | 'professor_id'>, forProfessorId?: string) {
+    const professorId = await this.determineProfessorId(forProfessorId);
+
+    const { data, error } = await supabase
+      .from('relatorios')
+      .insert({
+        ...relatorio,
+        professor_id: professorId
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async updateRelatorio(relatorioId: string, updates: Partial<Omit<Relatorio, 'id' | 'created_at' | 'professor_id'>>) {
+    await this.validatePermissions();
+    
+    const { data, error } = await supabase
+      .from('relatorios')
+      .update(updates)
+      .eq('id', relatorioId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteRelatorio(relatorioId: string) {
+    await this.validatePermissions();
+    
+    const { error } = await supabase
+      .from('relatorios')
+      .delete()
+      .eq('id', relatorioId);
+    
+    if (error) throw error;
+    return true;
+  }
+
+  // ============================================
+  // FUNÇÕES DE VALIDAÇÃO COM DETALHAMENTO
+  // ============================================
+
   async deleteTurmaWithValidation(turmaId: string) {
-    // 1. Verificar autenticação
-    const currentUser = await this.getCurrentUser();
-    
-    // 2. Verificar permissão (PROFESSOR OU ADMIN)
-    const userProfile = await this.getUserProfile(currentUser.id);
-    if (!userProfile || !['professor', 'admin'].includes(userProfile.tipo)) {
-      throw new Error('Permissão negada. Apenas professores e administradores podem deletar turmas.');
-    }
+    const { profile } = await this.validatePermissions();
 
-    // 3. Buscar dados da turma
     const { data: turma, error: turmaError } = await supabase
       .from('turmas')
       .select('nome, faixa_etaria')
@@ -180,7 +498,6 @@ const database = {
       throw new Error('Turma não encontrada');
     }
 
-    // 4. Contar registros que serão deletados
     const { count: alunosCount } = await supabase
       .from('alunos')
       .select('*', { count: 'exact', head: true })
@@ -211,7 +528,6 @@ const database = {
       }
     }
 
-    // 5. Executar deleção (CASCADE fará o resto)
     const { error: deleteError } = await supabase
       .from('turmas')
       .delete()
@@ -221,86 +537,21 @@ const database = {
       throw new Error(`Erro ao deletar turma: ${deleteError.message}`);
     }
 
-    // 6. Retornar resultado detalhado
     return {
       sucesso: true,
       turma: turma.nome,
-      usuario: userProfile.nome,
+      usuario: profile.nome,
       dadosRemovidos: {
         alunos: alunosCount || 0,
         observacoes: totalObservacoes,
         relatorios: totalRelatorios
       }
     };
-  },
+  }
 
-  // ============================================
-  // ALUNOS - FUNÇÕES ORIGINAIS + VALIDAÇÃO
-  // ============================================
-
-  async getAlunos() {
-    const { data, error } = await supabase
-      .from('alunos')
-      .select('*')
-      .order('nome')
-    
-    if (error) throw error
-    return data
-  },
-
-  async createAluno(aluno: Omit<Aluno, 'id' | 'created_at' | 'relatorios_count'>) {
-    const { data, error } = await supabase
-      .from('alunos')
-      .insert({
-        nome: aluno.nome,
-        turma_id: aluno.turma_id,
-        data_nascimento: aluno.data_nascimento,
-        responsavel: aluno.responsavel,
-        telefone: aluno.telefone,
-        observacoes: aluno.observacoes
-      })
-      .select()
-      .single()
-    
-    if (error) throw error
-    return data
-  },
-
-  async updateAluno(id: string, aluno: Partial<Omit<Aluno, 'id' | 'created_at'>>) {
-    const { data, error } = await supabase
-      .from('alunos')
-      .update(aluno)
-      .eq('id', id)
-      .select()
-      .single()
-    
-    if (error) throw error
-    return data
-  },
-
-  // FUNÇÃO ORIGINAL (SEM VALIDAÇÃO) - MANTIDA PARA COMPATIBILIDADE
-  async deleteAluno(id: string) {
-    const { error } = await supabase
-      .from('alunos')
-      .delete()
-      .eq('id', id)
-    
-    if (error) throw error
-    return true
-  },
-
-  // NOVA FUNÇÃO COM VALIDAÇÃO - PROFESSOR OU ADMIN PODEM DELETAR
   async deleteAlunoWithValidation(alunoId: string) {
-    // 1. Verificar autenticação
-    const currentUser = await this.getCurrentUser();
-    
-    // 2. Verificar permissão (PROFESSOR OU ADMIN)
-    const userProfile = await this.getUserProfile(currentUser.id);
-    if (!userProfile || !['professor', 'admin'].includes(userProfile.tipo)) {
-      throw new Error('Permissão negada. Apenas professores e administradores podem deletar alunos.');
-    }
+    const { profile } = await this.validatePermissions();
 
-    // 3. Buscar dados do aluno
     const { data: aluno, error: alunoError } = await supabase
       .from('alunos')
       .select('nome, turma_id, responsavel')
@@ -311,7 +562,6 @@ const database = {
       throw new Error('Aluno não encontrado');
     }
 
-    // 4. Contar registros relacionados que serão deletados
     const { count: observacoesCount } = await supabase
       .from('observacoes_aluno')
       .select('*', { count: 'exact', head: true })
@@ -322,7 +572,6 @@ const database = {
       .select('*', { count: 'exact', head: true })
       .eq('aluno_id', alunoId);
 
-    // 5. Executar deleção (CASCADE cuidará das observações e relatórios)
     const { error: deleteError } = await supabase
       .from('alunos')
       .delete()
@@ -332,79 +581,20 @@ const database = {
       throw new Error(`Erro ao deletar aluno: ${deleteError.message}`);
     }
 
-    // 6. Retornar resultado detalhado
     return {
       sucesso: true,
       aluno: aluno.nome,
-      usuario: userProfile.nome,
+      usuario: profile.nome,
       dadosRemovidos: {
         observacoes: observacoesCount || 0,
         relatorios: relatoriosCount || 0
       }
     };
-  },
+  }
 
-  // ============================================
-  // OBSERVAÇÕES - FUNÇÕES ORIGINAIS + VALIDAÇÃO
-  // ============================================
-
-  async getObservacoesByAluno(alunoId: string) {
-    const { data, error } = await supabase
-      .from('observacoes_aluno')
-      .select('*')
-      .eq('id_aluno', alunoId)
-      .order('data_registro', { ascending: false })
-    
-    if (error) throw error
-    return data
-  },
-
-  async createObservacao(observacao: CreateObservacaoData) {
-    const { data, error } = await supabase
-      .from('observacoes_aluno')
-      .insert([observacao])
-      .select()
-      .single()
-    
-    if (error) throw error
-    return data
-  },
-
-  async updateObservacao(id: number, updates: Partial<CreateObservacaoData>) {
-    const { data, error } = await supabase
-      .from('observacoes_aluno')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
-    
-    if (error) throw error
-    return data
-  },
-
-  // FUNÇÃO ORIGINAL (SEM VALIDAÇÃO) - MANTIDA PARA COMPATIBILIDADE
-  async deleteObservacao(id: number) {
-    const { error } = await supabase
-      .from('observacoes_aluno')
-      .delete()
-      .eq('id', id)
-    
-    if (error) throw error
-    return true
-  },
-
-  // NOVA FUNÇÃO COM VALIDAÇÃO - PROFESSOR OU ADMIN PODEM DELETAR
   async deleteObservacaoWithValidation(observacaoId: number) {
-    // 1. Verificar autenticação
-    const currentUser = await this.getCurrentUser();
-    
-    // 2. Verificar permissão (PROFESSOR OU ADMIN)
-    const userProfile = await this.getUserProfile(currentUser.id);
-    if (!userProfile || !['professor', 'admin'].includes(userProfile.tipo)) {
-      throw new Error('Permissão negada. Apenas professores e administradores podem deletar observações.');
-    }
+    const { profile } = await this.validatePermissions();
 
-    // 3. Executar deleção
     const { error } = await supabase
       .from('observacoes_aluno')
       .delete()
@@ -412,99 +602,15 @@ const database = {
 
     if (error) throw new Error(`Erro ao deletar observação: ${error.message}`);
 
-    return { 
-      sucesso: true, 
-      usuario: userProfile.nome 
+    return {
+      sucesso: true,
+      usuario: profile.nome
     };
-  },
+  }
 
-  async getAllObservacoes() {
-    const { data, error } = await supabase
-      .from('observacoes_aluno')
-      .select(`
-        *,
-        alunos!id_aluno(nome, turma_id)
-      `)
-      .order('data_registro', { ascending: false })
-    
-    if (error) throw error
-    return data
-  },
-
-  // ============================================
-  // RELATÓRIOS - FUNÇÕES ORIGINAIS + VALIDAÇÃO
-  // ============================================
-
-  async getRelatorios() {
-    const { data, error } = await supabase
-      .from('relatorios')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    if (error) throw error
-    return data
-  },
-
-  async createRelatorio(relatorio: {
-    aluno_id: string;
-    titulo: string;
-    periodo: string;
-    conteudo: string;
-    observacoes: string;
-    status: 'rascunho' | 'concluido';
-    gerado_por_ia: boolean;
-  }) {
-    const { data, error } = await supabase
-      .from('relatorios')
-      .insert(relatorio)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  },
-
-  async updateRelatorio(id: string, updates: {
-    titulo?: string;
-    periodo?: string;
-    conteudo?: string;
-    observacoes?: string;
-    status?: 'rascunho' | 'concluido';
-  }) {
-    const { data, error } = await supabase
-      .from('relatorios')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  },
-
-  // FUNÇÃO ORIGINAL (SEM VALIDAÇÃO) - MANTIDA PARA COMPATIBILIDADE
-  async deleteRelatorio(id: string) {
-    const { error } = await supabase
-      .from('relatorios')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
-    return true
-  },
-
-  // NOVA FUNÇÃO COM VALIDAÇÃO - PROFESSOR OU ADMIN PODEM DELETAR
   async deleteRelatorioWithValidation(relatorioId: string) {
-    // 1. Verificar autenticação
-    const currentUser = await this.getCurrentUser();
-    
-    // 2. Verificar permissão (PROFESSOR OU ADMIN)
-    const userProfile = await this.getUserProfile(currentUser.id);
-    if (!userProfile || !['professor', 'admin'].includes(userProfile.tipo)) {
-      throw new Error('Permissão negada. Apenas professores e administradores podem deletar relatórios.');
-    }
+    const { profile } = await this.validatePermissions();
 
-    // 3. Executar deleção
     const { error } = await supabase
       .from('relatorios')
       .delete()
@@ -512,63 +618,74 @@ const database = {
 
     if (error) throw new Error(`Erro ao deletar relatório: ${error.message}`);
 
-    return { 
-      sucesso: true, 
-      usuario: userProfile.nome 
+    return {
+      sucesso: true,
+      usuario: profile.nome
     };
-  },
+  }
 
   // ============================================
-  // FUNCTIONS AVANÇADAS (MANTIDAS ORIGINAIS)
+  // FUNÇÕES AVANÇADAS (MANTIDAS COM VALIDAÇÃO)
   // ============================================
 
   async getDashboardObservacoes() {
+    await this.validatePermissions();
+    
     const { data, error } = await supabase
       .from('dashboard_observacoes')
-      .select('*')
+      .select('*');
     
-    if (error) throw error
-    return data || []
-  },
+    if (error) throw error;
+    return data || [];
+  }
 
   async getProgressoAluno(alunoId: string) {
-    const { data, error } = await supabase
-      .rpc('get_progresso_aluno', { aluno_uuid: alunoId })
+    await this.validatePermissions();
     
-    if (error) throw error
-    return data || []
-  },
+    const { data, error } = await supabase
+      .rpc('get_progresso_aluno', { aluno_uuid: alunoId });
+    
+    if (error) throw error;
+    return data || [];
+  }
 
   async getMediaAvaliacaoAluno(alunoId: string) {
-    const { data, error } = await supabase
-      .rpc('get_aluno_media_avaliacao', { aluno_uuid: alunoId })
+    await this.validatePermissions();
     
-    if (error) throw error
-    return data || 0
-  },
+    const { data, error } = await supabase
+      .rpc('get_aluno_media_avaliacao', { aluno_uuid: alunoId });
+    
+    if (error) throw error;
+    return data || 0;
+  }
 
   async getObservacoesPeriodo(dataInicio: string, dataFim: string, alunoId?: string) {
+    await this.validatePermissions();
+    
     const { data, error } = await supabase
       .rpc('get_observacoes_periodo', {
         data_inicio: dataInicio,
         data_fim: dataFim,
         aluno_uuid: alunoId || null
-      })
+      });
     
-    if (error) throw error
-    return data || []
-  },
+    if (error) throw error;
+    return data || [];
+  }
 
   async getEstatisticasTurma(turmaId: string) {
-    const { data, error } = await supabase
-      .rpc('get_estatisticas_turma', { turma_uuid: turmaId })
+    await this.validatePermissions();
     
-    if (error) throw error
-    return data?.[0] || null
-  },
+    const { data, error } = await supabase
+      .rpc('get_estatisticas_turma', { turma_uuid: turmaId });
+    
+    if (error) throw error;
+    return data?.[0] || null;
+  }
 
-  // Busca com texto completo
   async searchObservacoes(searchTerm: string) {
+    await this.validatePermissions();
+    
     const { data, error } = await supabase
       .from('observacoes_aluno')
       .select(`
@@ -579,11 +696,14 @@ const database = {
         type: 'websearch',
         config: 'portuguese'
       })
-      .order('data_registro', { ascending: false })
-    
-    if (error) throw error
-    return data || []
+      .order('data_registro', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
   }
 }
+
+// Instância única do helper
+const database = new DatabaseHelper();
 
 export { supabase, database };
