@@ -45,7 +45,7 @@ interface AlunosManagerProps {
 
 export function AlunosManager() {
   const navigate = useNavigate();
-  const { alunos, turmas, loading, onAlunosChange, onTurmasChange } = useApp();
+  const { alunos, turmas, loading, onAlunosChange, onTurmasChange, refreshAlunos } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAluno, setEditingAluno] = useState<Aluno | null>(null);
@@ -121,12 +121,12 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
       responsavel: novoAlunoDb.responsavel,
       telefone: novoAlunoDb.telefone || "",
       observacoes: novoAlunoDb.observacoes || "",
-      relatoriosCount: 0,
-      observacoes_count: 0
+      relatoriosCount: 0, // Inicializa com 0, será atualizado no refresh
+      observacoes_count: 0 // Inicializa com 0, será atualizado no refresh
     };
 
     // Atualizar lista de alunos no estado
-    onAlunosChange([...alunos, novoAluno]);
+    // onAlunosChange([...alunos, novoAluno]); // Não é mais necessário, refreshAlunos fará isso
 
     // Atualizar contador da turma
     const turmasAtualizadas = turmas.map(t =>
@@ -138,6 +138,7 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
 
     setIsAddDialogOpen(false);
     resetForm();
+    await refreshAlunos(); // Recarregar alunos para obter os counts atualizados
     
     toast({
       title: "Aluno cadastrado!",
@@ -182,14 +183,16 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
       dataNascimento: alunoAtualizado.data_nascimento,
       responsavel: alunoAtualizado.responsavel,
       telefone: alunoAtualizado.telefone || "",
-      observacoes: alunoAtualizado.observacoes || ""
+      observacoes: alunoAtualizado.observacoes || "",
+      relatoriosCount: editingAluno.relatoriosCount, // Manter os counts existentes
+      observacoes_count: editingAluno.observacoes_count // Manter os counts existentes
     };
 
     // Atualizar no estado
     const alunosAtualizados = alunos.map(aluno =>
       aluno.id === editingAluno.id ? alunoFormatado : aluno
     );
-    onAlunosChange(alunosAtualizados);
+    // onAlunosChange(alunosAtualizados); // Não é mais necessário, refreshAlunos fará isso
 
     // Atualizar contadores das turmas se mudou de turma
     const turmaAnterior = editingAluno.turmaId;
@@ -205,12 +208,13 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
         }
         return t;
       });
-      onTurmasChange(turmasAtualizadas);
+    onTurmasChange(turmasAtualizadas);
     }
 
     setIsEditDialogOpen(false);
     setEditingAluno(null);
     resetForm();
+    await refreshAlunos(); // Recarregar alunos para obter os counts atualizados
     
     toast({
       title: "Aluno atualizado!",
@@ -232,8 +236,8 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
 
       await database.deleteAluno(aluno.id);
 
-      const alunosAtualizados = alunos.filter(a => a.id !== aluno.id);
-      onAlunosChange(alunosAtualizados);
+      // const alunosAtualizados = alunos.filter(a => a.id !== aluno.id); // Não é mais necessário, refreshAlunos fará isso
+      // onAlunosChange(alunosAtualizados);
 
       const turmasAtualizadas = turmas.map(t =>
         t.id === aluno.turmaId
@@ -241,7 +245,8 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
           : t
       );
       onTurmasChange(turmasAtualizadas);
-
+      await refreshAlunos(); // Recarregar alunos para obter os counts atualizados
+      
       toast({
         title: "Aluno removido",
         description: `${aluno.nome} foi removido do sistema e banco de dados.`
@@ -298,7 +303,7 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
         
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-rose-500 text-white hover:bg-rose-600">
+            <Button className="bg-amber-500 text-white hover:bg-amber-600">
               <Plus className="h-4 w-4 mr-2" />
               Novo Aluno
             </Button>
@@ -371,7 +376,7 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
               <Button variant="cancel" onClick={() => setIsAddDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleAdd} className="bg-rose-500 text-white hover:bg-rose-600">
+              <Button onClick={handleAdd} className="bg-amber-500 text-white hover:bg-amber-600">
                 Cadastrar Aluno
               </Button>
             </DialogFooter>
@@ -588,7 +593,7 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
               }
             </p>
             {turmas.length > 0 && (
-              <Button onClick={() => setIsAddDialogOpen(true)} className="bg-rose-500 text-white hover:bg-rose-600">
+              <Button onClick={() => setIsAddDialogOpen(true)} className="bg-amber-500 text-white hover:bg-amber-600">
                 <Plus className="h-4 w-4 mr-2" />
                 Cadastrar Primeiro Aluno
               </Button>

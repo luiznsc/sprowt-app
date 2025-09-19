@@ -59,7 +59,7 @@ export function DashboardHome() {
       title: "Total de Alunos",
       value: data.alunos.length.toString(),
       icon: BookOpen,
-      color: "bg-gradient-rose",
+      color: "bg-gradient-amber",
       description: data.alunos.length > 0 
         ? "Distribuídos nas turmas" 
         : "Nenhum aluno cadastrado"
@@ -169,13 +169,13 @@ export function DashboardHome() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-sm font-medium text-muted-foreground min-h-10">
                       {stat.title}
                     </p>
                     <p className="text-2xl font-bold text-foreground">
                       {stat.value}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-1 min-h-8">
                       {stat.description}
                     </p>
                   </div>

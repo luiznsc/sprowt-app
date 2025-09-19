@@ -18,9 +18,9 @@ import { deleteTurma } from "@/utils/deleteHelpers";
 interface Turma {
   id: string;
   nome: string;
-  faixaEtaria: string;
+  faixa_etaria: string;
   cor: string;
-  alunosCount: number;
+  alunos_count: number;
   created_at?: string;
 }
 
@@ -32,14 +32,14 @@ interface TurmasManagerProps {
 // ✅ ADIÇÃO NECESSÁRIA - HOOK DE CONFIRMAÇÃO INLINE
 function useConfirmation() {
   const [isOpen, setIsOpen] = useState(false);
-  const [options, setOptions] = useState(null);
-  const [promiseResolve, setPromiseResolve] = useState(null);
+  const [options, setOptions] = useState<any>(null);
+  const [promiseResolve, setPromiseResolve] = useState<((value: boolean | PromiseLike<boolean>) => void) | null>(null);
 
-  const confirm = (opts) => {
+  const confirm = (opts: any): Promise<boolean> => {
     setOptions(opts);
     setIsOpen(true);
     
-    return new Promise((resolve) => {
+    return new Promise<boolean>((resolve) => {
       setPromiseResolve(() => resolve);
     });
   };
@@ -121,7 +121,7 @@ export function TurmasManager() {
   const [editingTurma, setEditingTurma] = useState(null);
   const [formData, setFormData] = useState({
     nome: "",
-    faixaEtaria: "",
+    faixa_etaria: "", // Changed from faixa_etaria to faixa_etaria
     cor: "bg-gradient-primary"
   });
   const { toast } = useToast();
@@ -153,15 +153,21 @@ export function TurmasManager() {
     { value: "bg-gradient-primary", label: "Azul", color: "bg-blue-500" },
     { value: "bg-gradient-secondary", label: "Amarelo", color: "bg-yellow-500" },
     { value: "bg-gradient-success", label: "Verde", color: "bg-green-500" },
-    { value: "bg-gradient-accent", label: "Roxo", color: "bg-purple-500" }
+    { value: "bg-gradient-accent", label: "Roxo", color: "bg-purple-500" },
+    { value: "bg-gradient-info", label: "Ciano", color: "bg-cyan-500" },
+    { value: "bg-gradient-warning", label: "Laranja", color: "bg-orange-500" },
+    { value: "bg-gradient-danger", label: "Vermelho", color: "bg-red-500" },
+    { value: "bg-gradient-pink", label: "Rosa", color: "bg-pink-500" },
+    { value: "bg-gradient-teal", label: "Verde-azulado", color: "bg-teal-500" },
+    { value: "bg-gradient-indigo", label: "Índigo", color: "bg-indigo-500" }
   ];
 
   const resetForm = () => {
-    setFormData({ nome: "", faixaEtaria: "", cor: "bg-gradient-primary" });
+    setFormData({ nome: "", faixa_etaria: "", cor: "bg-gradient-primary" });
   };
 
   const handleAdd = async () => {
-    if (!formData.nome || !formData.faixaEtaria) {
+    if (!formData.nome || !formData.faixa_etaria) {
       toast({
         title: "Campos obrigatórios",
         description: "Preencha todos os campos",
@@ -173,7 +179,7 @@ export function TurmasManager() {
     try {
       const novaTurma = await database.createTurma({
         nome: formData.nome,
-        faixa_etaria: formData.faixaEtaria,
+        faixa_etaria: formData.faixa_etaria,
         cor: formData.cor
       });
 
@@ -195,12 +201,12 @@ export function TurmasManager() {
   };
 
   const handleEdit = async () => {
-    if (!editingTurma || !formData.nome || !formData.faixaEtaria) return;
+    if (!editingTurma || !formData.nome || !formData.faixa_etaria) return;
 
     try {
       const turmaAtualizada = await database.updateTurma(editingTurma.id, {
         nome: formData.nome,
-        faixa_etaria: formData.faixaEtaria,
+        faixa_etaria: formData.faixa_etaria,
         cor: formData.cor
       });
 
@@ -244,7 +250,7 @@ export function TurmasManager() {
     setEditingTurma(turma);
     setFormData({
       nome: turma.nome,
-      faixaEtaria: turma.faixaEtaria,
+      faixa_etaria: turma.faixa_etaria,
       cor: turma.cor
     });
     setIsEditDialogOpen(true);
@@ -304,7 +310,7 @@ export function TurmasManager() {
               
               <div className="space-y-2">
                 <Label>Faixa Etária</Label>
-                <Select value={formData.faixaEtaria} onValueChange={(value) => setFormData({ ...formData, faixaEtaria: value })}>
+                <Select value={formData.faixa_etaria} onValueChange={(value) => setFormData({ ...formData, faixa_etaria: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a faixa etária" />
                   </SelectTrigger>
@@ -367,7 +373,7 @@ export function TurmasManager() {
             
             <div className="space-y-2">
               <Label>Faixa Etária</Label>
-              <Select value={formData.faixaEtaria} onValueChange={(value) => setFormData({ ...formData, faixaEtaria: value })}>
+              <Select value={formData.faixa_etaria} onValueChange={(value) => setFormData({ ...formData, faixa_etaria: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a faixa etária" />
                 </SelectTrigger>
@@ -417,7 +423,7 @@ export function TurmasManager() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`w-4 h-4 rounded-full ${cores.find(c => c.value === turma.cor)?.color || 'bg-gray-400'}`} />
-                  <Badge variant="secondary">{turma.faixaEtaria}</Badge>
+                  <Badge variant="outline">{turma.faixa_etaria}</Badge>
                 </div>
                 <div className="flex gap-1">
                   <Button
@@ -444,11 +450,11 @@ export function TurmasManager() {
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  <span>{turma.alunosCount} aluno(s)</span>
+                  <span>{turma.alunos_count} aluno(s)</span>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                {turma.faixaEtaria}
+                {turma.faixa_etaria}
               </p>
             </CardContent>
           </Card>

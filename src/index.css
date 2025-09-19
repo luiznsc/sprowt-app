@@ -69,6 +69,11 @@ select:focus {
     
     --rose: 351 83% 61%;
     --rose-light: 351 83% 90%;
+  
+    --amber: 47 100% 50%;
+    /*--amber: 45 96% 53%;*/
+    --amber-light: 45 96% 85%;
+    
 
     /* Educational themed gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
@@ -82,6 +87,7 @@ select:focus {
     --gradient-purple: linear-gradient(135deg, hsl(var(--purple)), hsl(var(--purple-light)));
     --gradient-rose: linear-gradient(135deg, hsl(var(--rose)), hsl(var(--rose-light)));
     --gradient-green-custom: linear-gradient(90deg, #1A2E1A, #2E4E0E);  
+    --gradient-amber: linear-gradient(135deg, hsl(var(--amber)), hsl(var(--amber-light)));
 
     /* Shadows */
     --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -195,6 +201,9 @@ select:focus {
   
   .bg-gradient-rose {
     background: var(--gradient-rose);
+  }
+  .bg-gradient-amber {
+    background: var(--gradient-amber);
   }
 }
 

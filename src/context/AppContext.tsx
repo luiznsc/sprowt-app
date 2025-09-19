@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { database } from '@/lib/supabase';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, User, Session } from '@supabase/supabase-js';
 
 // Inicializar cliente Supabase para autenticação
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -23,6 +23,7 @@ interface Aluno {
   telefone: string;
   observacoes: string;
   relatoriosCount: number;
+  observacoes_count: number;
 }
 
 interface Turma {
@@ -57,10 +58,11 @@ export interface AppContextType {
   onAlunosChange: (alunos: Aluno[]) => void;
   onTurmasChange: (turmas: Turma[]) => void;
   onRelatoriosChange: (relatorios: Relatorio[]) => void;
+  refreshAlunos: () => Promise<void>; // Adicionar função para recarregar alunos
   
   // NOVOS: Estados de autenticação
-  user: any;
-  session: any;
+  user: User | null;
+  session: Session | null;
   supabase: typeof supabase;
   authLoading: boolean;
   
@@ -78,8 +80,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // NOVOS: Estados de autenticação
-  const [user, setUser] = useState(null);
-  const [session, setSession] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   // Efeito para gerenciar autenticação
@@ -121,7 +123,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     responsavel: aluno.responsavel,
     telefone: aluno.telefone || '',
     observacoes: aluno.observacoes || '',
-    relatoriosCount: aluno.relatorios_count || 0
+    relatoriosCount: aluno.relatorios_count || 0,
+    observacoes_count: aluno.observacoes_count || 0
   });
 
   // Efeito existente para carregar dados
@@ -211,6 +214,109 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRelatorios(newRelatorios);
   }, []);
 
+  const refreshAlunos = useCallback(async () => {
+    setLoading(true);
+    try {
+      const alunosData = await database.getAlunos();
+      const turmasData = await database.getTurmas(); // Re-fetch turmas to ensure counts are correct
+      
+      const turmasTransformadas = turmasData.map(transformTurmaData);
+
+      const alunosTransformados = alunosData.map(aluno => {
+        const alunoTransformado = transformAlunoData(aluno);
+        const turma = turmasTransformadas.find(t => t.id === aluno.turma_id);
+        if (turma) {
+          alunoTransformado.turma = turma.nome;
+          if (aluno.data_nascimento) {
+            const hoje = new Date();
+            const nascimento = new Date(aluno.data_nascimento);
+            let idade = hoje.getFullYear() - nascimento.getFullYear();
+            const mes = hoje.getMonth() - nascimento.getMonth();
+            if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+              idade--;
+            }
+            alunoTransformado.idade = idade;
+          }
+        }
+        return alunoTransformado;
+      });
+      setAlunos(alunosTransformados);
+      setTurmas(turmasTransformadas); // Update turmas as well
+    } catch (error) {
+      console.error('❌ Erro ao recarregar alunos:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [transformAlunoData, transformTurmaData]); // Dependências para useCallback
+
+  // Modificar useEffect para usar refreshAlunos
+  useEffect(() => {
+    loadInitialData(); // Chamar a função original para carregar todos os dados
+  }, []);
+
+  async function loadInitialData() {
+    setLoading(true);
+    try {
+      const [turmasData, alunosData, relatoriosData] = await Promise.all([
+        database.getTurmas(),
+        database.getAlunos(),
+        database.getRelatorios()
+      ]);
+      
+      const turmasTransformadas = turmasData.map(transformTurmaData);
+      
+      const alunosTransformados = alunosData.map(aluno => {
+        const alunoTransformado = transformAlunoData(aluno);
+        const turma = turmasTransformadas.find(t => t.id === aluno.turma_id);
+        if (turma) {
+          alunoTransformado.turma = turma.nome;
+          if (aluno.data_nascimento) {
+            const hoje = new Date();
+            const nascimento = new Date(aluno.data_nascimento);
+            let idade = hoje.getFullYear() - nascimento.getFullYear();
+            const mes = hoje.getMonth() - nascimento.getMonth();
+            if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+              idade--;
+            }
+            alunoTransformado.idade = idade;
+          }
+        }
+        return alunoTransformado;
+      });
+      
+      const relatoriosTransformados = relatoriosData.map(relatorio => ({
+        id: relatorio.id,
+        alunoId: relatorio.aluno_id,
+        alunoNome: '',
+        turma: '',
+        titulo: relatorio.titulo || '',
+        periodo: relatorio.periodo || '',
+        conteudo: relatorio.conteudo,
+        observacoes: relatorio.observacoes || '',
+        status: relatorio.status || 'rascunho',
+        criadoEm: relatorio.created_at,
+        atualizadoEm: relatorio.updated_at || relatorio.created_at,
+        geradoPorIA: relatorio.gerado_por_ia || false
+      }));
+
+      relatoriosTransformados.forEach(relatorio => {
+        const aluno = alunosTransformados.find(a => a.id === relatorio.alunoId);
+        if (aluno) {
+          relatorio.alunoNome = aluno.nome;
+          relatorio.turma = aluno.turma;
+        }
+      });
+      
+      setTurmas(turmasTransformadas);
+      setAlunos(alunosTransformados);
+      setRelatorios(relatoriosTransformados);
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados iniciais:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Função simplificada para chamar IA - apenas envia prompt do usuário
   const onRequestAI = useCallback(async (prompt: string, alunoNome?: string): Promise<string> => {
     try {
@@ -260,6 +366,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         onAlunosChange,
         onTurmasChange,
         onRelatoriosChange,
+        refreshAlunos,
         
         // NOVOS: Estados de autenticação
         user,

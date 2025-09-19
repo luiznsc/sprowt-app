@@ -9,32 +9,30 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// ============================================
-// TIPOS ATUALIZADOS COM PROFESSOR_ID
-// ============================================
-
 export interface Turma {
   id: string
   nome: string
   faixa_etaria: string
   cor: string
-  alunos_count: number
-  professor_id: string  // ✅ OBRIGATÓRIO
+  alunos_count: number // Reverted to alunos_count as per database pattern
+  professor_id: string  
   created_at: string
 }
 
 export interface Aluno {
-  id: string
-  nome: string
-  turma_id: string
-  data_nascimento: string
-  responsavel: string
-  telefone?: string
-  observacoes?: string
-  relatorios_count: number
-  professor_id: string  // ✅ OBRIGATÓRIO
-  created_at: string
+  id: string;
+  nome: string;
+  turma_id: string;
+  data_nascimento: string;
+  responsavel: string;
+  telefone?: string;
+  observacoes?: string;
+  relatorios_count: number;
+  observacoes_count: number;
+  professor_id: string;
+  created_at: string; 
 }
+
 
 export interface ObservacaoAluno {
   id: number;
@@ -43,7 +41,7 @@ export interface ObservacaoAluno {
   tipo_obs: TipoObservacao;
   range_avaliacao: number;
   obs: string;
-  professor_id: string;  // ✅ OBRIGATÓRIO
+  professor_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -74,7 +72,7 @@ export interface Relatorio {
   observacoes: string
   status: 'rascunho' | 'concluido'
   gerado_por_ia: boolean
-  professor_id: string  // ✅ OBRIGATÓRIO
+  professor_id: string 
   data: string
   created_at: string
 }
@@ -86,12 +84,8 @@ export interface UserProfile {
   created_at: string;
 }
 
-// ============================================
-// HELPERS GENÉRICOS PARA REDUZIR REPETIÇÃO
-// ============================================
 
 class DatabaseHelper {
-  // ✅ HELPER 1: Obter usuário atual com validação
   private async getCurrentUser() {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw new Error(`Erro de autenticação: ${error.message}`);
@@ -99,7 +93,6 @@ class DatabaseHelper {
     return user;
   }
 
-  // ✅ HELPER 2: Obter profile do usuário
   private async getUserProfile(userId: string): Promise<UserProfile> {
     const { data, error } = await supabase
       .from('profiles')
@@ -110,18 +103,15 @@ class DatabaseHelper {
     return data;
   }
 
-  // ✅ HELPER 3: Determinar professor_id com validação de permissões
   private async determineProfessorId(forProfessorId?: string): Promise<string> {
     const user = await this.getCurrentUser();
     const profile = await this.getUserProfile(user.id);
     
     if (profile.tipo === 'admin') {
-      // Admin pode criar para qualquer professor (ou para si mesmo)
       return forProfessorId || user.id;
     }
     
     if (profile.tipo === 'professor') {
-      // Professor só pode criar para si mesmo
       if (forProfessorId && forProfessorId !== user.id) {
         throw new Error('Professores só podem criar dados para si mesmos');
       }
@@ -131,7 +121,6 @@ class DatabaseHelper {
     throw new Error('Tipo de usuário não autorizado');
   }
 
-  // ✅ HELPER 4: Validar permissões para operações
   private async validatePermissions(): Promise<{ user: any, profile: UserProfile }> {
     const user = await this.getCurrentUser();
     const profile = await this.getUserProfile(user.id);
@@ -143,20 +132,22 @@ class DatabaseHelper {
     return { user, profile };
   }
 
-  // ============================================
-  // TURMAS - CRUD COMPLETO COM VALIDAÇÕES
-  // ============================================
 
   async getTurmas() {
     await this.validatePermissions(); // ✅ Validar antes de buscar
     
     const { data, error } = await supabase
       .from('turmas')
-      .select('*')
+      .select('*, alunos(count)') // Select all from turmas and count from alunos
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data;
+
+    // Map the data to ensure alunos_count is correctly assigned
+    return data.map(turma => ({
+      ...turma,
+      alunos_count: turma.alunos[0]?.count || 0 // Extract the count and assign to alunos_count
+    }));
   }
 
   async getTurma(turmaId: string) {
@@ -193,14 +184,9 @@ class DatabaseHelper {
   async updateTurma(turmaId: string, updates: Partial<Omit<Turma, 'id' | 'created_at' | 'alunos_count' | 'professor_id'>>) {
     await this.validatePermissions();
     
-    const updateData: any = {};
-    if (updates.nome) updateData.nome = updates.nome;
-    if (updates.faixa_etaria) updateData.faixa_etaria = updates.faixa_etaria;
-    if (updates.cor) updateData.cor = updates.cor;
-
     const { data, error } = await supabase
       .from('turmas')
-      .update(updateData)
+      .update(updates) // Use updates directly
       .eq('id', turmaId)
       .select()
       .single();
@@ -221,20 +207,27 @@ class DatabaseHelper {
     return true;
   }
 
-  // ============================================
-  // ALUNOS - CRUD COMPLETO COM VALIDAÇÕES
-  // ============================================
 
   async getAlunos() {
     await this.validatePermissions();
     
     const { data, error } = await supabase
       .from('alunos')
-      .select('*')
+      .select(`
+        *,
+        observacoes_aluno(count),
+        relatorios(count)
+      `)
       .order('nome');
     
     if (error) throw error;
-    return data;
+
+    // Map the data to ensure counts are correctly assigned
+    return data.map(aluno => ({
+      ...aluno,
+      observacoes_count: aluno.observacoes_aluno[0]?.count || 0,
+      relatorios_count: aluno.relatorios[0]?.count || 0
+    }));
   }
 
   async getAluno(alunoId: string) {
@@ -263,7 +256,7 @@ class DatabaseHelper {
     return data;
   }
 
-  async createAluno(aluno: Omit<Aluno, 'id' | 'created_at' | 'relatorios_count' | 'professor_id'>, forProfessorId?: string) {
+  async createAluno(aluno: Omit<Aluno, 'id' | 'created_at' | 'relatorios_count' | 'observacoes_count' | 'professor_id'>, forProfessorId?: string) {
     const professorId = await this.determineProfessorId(forProfessorId);
 
     const { data, error } = await supabase
@@ -309,10 +302,6 @@ class DatabaseHelper {
     if (error) throw error;
     return true;
   }
-
-  // ============================================
-  // OBSERVAÇÕES - CRUD COMPLETO COM VALIDAÇÕES
-  // ============================================
 
   async getAllObservacoes() {
     await this.validatePermissions();
@@ -481,9 +470,6 @@ class DatabaseHelper {
     return true;
   }
 
-  // ============================================
-  // FUNÇÕES DE VALIDAÇÃO COM DETALHAMENTO
-  // ============================================
 
   async deleteTurmaWithValidation(turmaId: string) {
     const { profile } = await this.validatePermissions();
@@ -624,10 +610,6 @@ class DatabaseHelper {
     };
   }
 
-  // ============================================
-  // FUNÇÕES AVANÇADAS (MANTIDAS COM VALIDAÇÃO)
-  // ============================================
-
   async getDashboardObservacoes() {
     await this.validatePermissions();
     
@@ -703,7 +685,6 @@ class DatabaseHelper {
   }
 }
 
-// Instância única do helper
 const database = new DatabaseHelper();
 
 export { supabase, database };
