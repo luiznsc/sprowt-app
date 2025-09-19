@@ -15,6 +15,7 @@ import {
   Plus,
   StickyNote
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function DashboardHome() {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ export function DashboardHome() {
     relatorios: [],
     observacoes: []
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
@@ -39,6 +41,8 @@ export function DashboardHome() {
         setData({ turmas, alunos, relatorios, observacoes});
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -162,59 +166,92 @@ export function DashboardHome() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={index} className="bg-white shadow-soft hover:shadow-medium transition-smooth">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, index) => (
+            <Card key={index} className="bg-white shadow-soft">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground min-h-10">
-                      {stat.title}
-                    </p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {stat.value}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1 min-h-8">
-                      {stat.description}
-                    </p>
+                    <Skeleton className="h-4 w-[100px] mb-2" />
+                    <Skeleton className="h-8 w-[150px]" />
+                    <Skeleton className="h-3 w-[120px] mt-2" />
                   </div>
-                  <div className={`${stat.color} rounded-lg p-3`}>
-                    <Icon className="h-6 w-6 text-white" />
-                  </div>
+                  <Skeleton className="h-12 w-12 rounded-lg" />
                 </div>
               </CardContent>
             </Card>
-          );
-        })}
+          ))
+        ) : (
+          stats.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <Card key={index} className="bg-white shadow-soft hover:shadow-medium transition-smooth">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground min-h-10">
+                        {stat.title}
+                      </p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {stat.value}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 min-h-8">
+                        {stat.description}
+                      </p>
+                    </div>
+                    <div className={`${stat.color} rounded-lg p-3`}>
+                      <Icon className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
 
       {/* Quick Actions */}
       <div>
         <h3 className="text-xl font-semibold text-foreground mb-4">Ações Rápidas</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {quickActions.map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <Card 
-                key={index} 
-                className="bg-white shadow-soft hover:shadow-medium transition-smooth cursor-pointer"
-                onClick={action.action}
-              >
+          {loading ? (
+            Array.from({ length: 3 }).map((_, index) => (
+              <Card key={index} className="bg-white shadow-soft">
                 <CardHeader className="pb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`${action.color} rounded-lg p-2`}>
-                      <Icon className="h-5 w-5 text-white" />
-                    </div>
+                    <Skeleton className="h-10 w-10 rounded-lg" />
                     <div>
-                      <CardTitle className="text-lg">{action.title}</CardTitle>
-                      <CardDescription>{action.description}</CardDescription>
+                      <Skeleton className="h-5 w-[150px] mb-1" />
+                      <Skeleton className="h-4 w-[200px]" />
                     </div>
                   </div>
                 </CardHeader>
               </Card>
-            );
-          })}
+            ))
+          ) : (
+            quickActions.map((action, index) => {
+              const Icon = action.icon;
+              return (
+                <Card 
+                  key={index} 
+                  className="bg-white shadow-soft hover:shadow-medium transition-smooth cursor-pointer"
+                  onClick={action.action}
+                >
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`${action.color} rounded-lg p-2`}>
+                        <Icon className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{action.title}</CardTitle>
+                        <CardDescription>{action.description}</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })
+          )}
         </div>
       </div>
 

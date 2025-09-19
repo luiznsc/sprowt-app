@@ -11,7 +11,7 @@ import { Plus, Edit2, Trash2, Calendar, MessageSquare, Star, Filter } from "luci
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/context/use-app";
 import { useSearchParams } from "react-router-dom";
-import { database, ObservacaoAluno, TipoObservacao } from "@/lib/supabase";
+import { database, ObservacaoAluno, TipoObservacao, FilterTipoObservacao } from "@/lib/supabase";
 
 const tiposObservacao: { value: TipoObservacao; label: string; color: string }[] = [
   { value: 'comportamental', label: 'Comportamental', color: 'bg-blue-100 text-blue-800' },
@@ -35,7 +35,7 @@ export function ObservacoesManager() {
   
   // Filtros
   const [filtroAluno, setFiltroAluno] = useState(alunoSelecionado || "todos");
-  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [filtroTipo, setFiltroTipo] = useState<FilterTipoObservacao>("todos");
   
   const [formData, setFormData] = useState({
     id_aluno: alunoSelecionado || "",
@@ -49,20 +49,25 @@ export function ObservacoesManager() {
   const { toast } = useToast();
 
   useEffect(() => {
-    loadObservacoes();
+    loadObservacoes(filtroAluno, filtroTipo);
     if (alunoSelecionado) {
       setFiltroAluno(alunoSelecionado);
       setFormData(prev => ({ ...prev, id_aluno: alunoSelecionado }));
     }
-  }, [alunoSelecionado]);
+  }, [alunoSelecionado, filtroAluno, filtroTipo]); // Adicionar filtroAluno e filtroTipo como dependências
 
-  const loadObservacoes = async () => {
+  const loadObservacoes = async (alunoId?: string, tipoObs?: FilterTipoObservacao) => {
     try {
       setLoading(true);
-      const data = await database.getAllObservacoes();
+      const data = await database.getAllObservacoes(alunoId, tipoObs);
       setObservacoes(data);
     } catch (error) {
       console.error('Erro ao carregar observações:', error);
+      toast({
+        title: "Erro ao carregar observações",
+        description: "Não foi possível carregar as observações. Tente novamente.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -134,7 +139,7 @@ export function ObservacoesManager() {
   };
 
   const getTipoInfo = (tipo: TipoObservacao) => {
-    return tiposObservacao.find(t => t.value === tipo) || tiposObservacao;
+    return tiposObservacao.find(t => t.value === tipo) || { value: 'comportamental', label: 'Comportamental', color: 'bg-gray-100 text-gray-800' }; // Fallback para evitar erro de tipagem
   };
 
   const formatDate = (dateString: string) => {
@@ -147,12 +152,8 @@ export function ObservacoesManager() {
     });
   };
 
-  // Filtrar observações
-  const observacoesFiltradas = observacoes.filter(obs => {
-    const matchAluno = filtroAluno === "todos" || obs.id_aluno === filtroAluno;
-    const matchTipo = filtroTipo === "todos" || obs.tipo_obs === filtroTipo;
-    return matchAluno && matchTipo;
-  });
+  // As observações já vêm filtradas do banco de dados, então não precisamos de filtro aqui.
+  const observacoesFiltradas = observacoes;
 
   if (loading) {
     return (
@@ -324,7 +325,7 @@ export function ObservacoesManager() {
 
               <div>
                 <Label htmlFor="filtro-tipo">Tipo</Label>
-                <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+                <Select value={filtroTipo} onValueChange={(value: FilterTipoObservacao) => setFiltroTipo(value)}>
                   <SelectTrigger  className="bg-gray-200">
                     <SelectValue />
                   </SelectTrigger>
@@ -381,10 +382,10 @@ export function ObservacoesManager() {
                       <span>{formatDate(observacao.data_registro)}</span>
                     </div>
                     <Button
-                      variant="ghost"
+                      variant="destructiveOutline"
                       size="sm"
                       onClick={() => handleDelete(observacao)}
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      className="h-8 w-8 p-0"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -392,7 +393,9 @@ export function ObservacoesManager() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-foreground leading-relaxed">{observacao.obs}</p>
+                <p className="text-foreground leading-relaxed min-h-16 overflow-hidden text-ellipsis">
+                  {observacao.obs}
+                </p>
               </CardContent>
             </Card>
           );

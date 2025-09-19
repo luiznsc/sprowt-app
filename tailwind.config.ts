@@ -25,6 +25,11 @@ export default {
           light: "hsl(var(--primary-light))",
           glow: "hsl(var(--primary-glow))",
         },
+        sprowtGreen: {
+          DEFAULT: "#2E4E0E",
+          foreground: "#FFFFFF",
+          hover: "#1A2E1A",
+        },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, User } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -30,7 +30,8 @@ export interface Aluno {
   relatorios_count: number;
   observacoes_count: number;
   professor_id: string;
-  created_at: string; 
+  created_at: string;
+  turma?: string; // Added for the joined turma name
 }
 
 
@@ -55,6 +56,8 @@ export type TipoObservacao =
   | 'comunicacao'
   | 'autonomia'
   | 'rotina';
+
+export type FilterTipoObservacao = TipoObservacao | 'todos';
 
 export interface CreateObservacaoData {
   id_aluno: string;
@@ -121,7 +124,7 @@ class DatabaseHelper {
     throw new Error('Tipo de usuário não autorizado');
   }
 
-  private async validatePermissions(): Promise<{ user: any, profile: UserProfile }> {
+  private async validatePermissions(): Promise<{ user: User, profile: UserProfile }> {
     const user = await this.getCurrentUser();
     const profile = await this.getUserProfile(user.id);
     
@@ -134,20 +137,18 @@ class DatabaseHelper {
 
 
   async getTurmas() {
-    await this.validatePermissions(); // ✅ Validar antes de buscar
+    const { user } = await this.validatePermissions(); // Obter o usuário para filtrar
     
     const { data, error } = await supabase
       .from('turmas')
-      .select('*, alunos(count)') // Select all from turmas and count from alunos
+      .select('*') // Select all from turmas, assuming alunos_count is a direct column
+      .eq('professor_id', user.id) // Filtrar por professor_id
       .order('created_at', { ascending: false });
     
     if (error) throw error;
 
-    // Map the data to ensure alunos_count is correctly assigned
-    return data.map(turma => ({
-      ...turma,
-      alunos_count: turma.alunos[0]?.count || 0 // Extract the count and assign to alunos_count
-    }));
+    // No need to map if alunos_count is directly selected
+    return data;
   }
 
   async getTurma(turmaId: string) {
@@ -209,24 +210,23 @@ class DatabaseHelper {
 
 
   async getAlunos() {
-    await this.validatePermissions();
+    const { user } = await this.validatePermissions();
     
     const { data, error } = await supabase
       .from('alunos')
       .select(`
         *,
-        observacoes_aluno(count),
-        relatorios(count)
-      `)
+        turmas(nome)
+      `) // Select all from alunos, and the name from the related turma
+      .eq('professor_id', user.id) // Filtrar por professor_id
       .order('nome');
     
     if (error) throw error;
 
-    // Map the data to ensure counts are correctly assigned
+    // Map the data to ensure turma name is directly accessible
     return data.map(aluno => ({
       ...aluno,
-      observacoes_count: aluno.observacoes_aluno[0]?.count || 0,
-      relatorios_count: aluno.relatorios[0]?.count || 0
+      turma: aluno.turmas?.nome || 'Sem Turma' // Add turma name directly
     }));
   }
 
@@ -303,16 +303,25 @@ class DatabaseHelper {
     return true;
   }
 
-  async getAllObservacoes() {
-    await this.validatePermissions();
+  async getAllObservacoes(alunoId?: string, tipoObs?: FilterTipoObservacao) {
+    const { user } = await this.validatePermissions(); // Obter o usuário para filtrar
     
-    const { data, error } = await supabase
+    let query = supabase
       .from('observacoes_aluno')
       .select(`
         *,
         alunos!id_aluno(nome, turma_id)
       `)
-      .order('data_registro', { ascending: false });
+      .eq('professor_id', user.id); // Filtrar por professor_id
+
+    if (alunoId && alunoId !== "todos") {
+      query = query.eq('id_aluno', alunoId);
+    }
+    if (tipoObs && tipoObs !== "todos") {
+      query = query.eq('tipo_obs', tipoObs as TipoObservacao); // Cast to TipoObservacao
+    }
+
+    const { data, error } = await query.order('data_registro', { ascending: false });
     
     if (error) throw error;
     return data;
@@ -391,11 +400,12 @@ class DatabaseHelper {
   // ============================================
 
   async getRelatorios() {
-    await this.validatePermissions();
+    const { user } = await this.validatePermissions();
     
     const { data, error } = await supabase
       .from('relatorios')
       .select('*')
+      .eq('professor_id', user.id) // Filtrar por professor_id
       .order('created_at', { ascending: false });
     
     if (error) throw error;

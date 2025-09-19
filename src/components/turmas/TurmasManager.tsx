@@ -30,12 +30,20 @@ interface TurmasManagerProps {
 }
 
 // ✅ ADIÇÃO NECESSÁRIA - HOOK DE CONFIRMAÇÃO INLINE
+interface ConfirmationOptions {
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: 'default' | 'destructive';
+}
+
 function useConfirmation() {
   const [isOpen, setIsOpen] = useState(false);
-  const [options, setOptions] = useState<any>(null);
+  const [options, setOptions] = useState<ConfirmationOptions | null>(null);
   const [promiseResolve, setPromiseResolve] = useState<((value: boolean | PromiseLike<boolean>) => void) | null>(null);
 
-  const confirm = (opts: any): Promise<boolean> => {
+  const confirm = (opts: ConfirmationOptions): Promise<boolean> => {
     setOptions(opts);
     setIsOpen(true);
     
@@ -64,7 +72,7 @@ function useConfirmation() {
 }
 
 // ✅ ADIÇÃO NECESSÁRIA - COMPONENTE DE CONFIRMAÇÃO INLINE
-function ConfirmationDialog({ isOpen, options, onConfirm, onCancel }) {
+function ConfirmationDialog({ isOpen, options, onConfirm, onCancel }: { isOpen: boolean; options: ConfirmationOptions | null; onConfirm: () => void; onCancel: () => void }) {
   if (!options) return null;
 
   const {
@@ -427,7 +435,7 @@ export function TurmasManager() {
                 </div>
                 <div className="flex gap-1">
                   <Button
-                    variant="outline"
+                    variant="editOutline"
                     size="icon"
                     onClick={() => openEditDialog(turma)}
                     className="h-8 w-8 p-0"
@@ -435,10 +443,10 @@ export function TurmasManager() {
                     <Edit2 className="h-3 w-3" />
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="destructiveOutline"
                     size="icon"
                     onClick={() => handleDelete(turma)}
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    className="h-8 w-8 p-0"
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>

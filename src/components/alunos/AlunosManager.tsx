@@ -13,28 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/context/use-app";
 import { InputField } from "@/components/ui/InputField";
 import { database } from "@/lib/supabase";
-
-interface Aluno {
-  id: string;
-  nome: string;
-  idade: number;
-  turmaId: string;
-  turma: string;
-  dataNascimento: string;
-  responsavel: string;
-  telefone: string;
-  observacoes: string;
-  relatoriosCount: number;
-  observacoes_count: number;
-}
-
-interface Turma {
-  id: string;
-  nome: string;
-  faixaEtaria: string;
-  cor: string;
-  alunosCount: number;
-}
+import { Aluno, Turma } from "@/context/AppContext"; // Import Aluno and Turma from AppContext
 
 interface AlunosManagerProps {
   alunos: Aluno[];
@@ -121,7 +100,7 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
       responsavel: novoAlunoDb.responsavel,
       telefone: novoAlunoDb.telefone || "",
       observacoes: novoAlunoDb.observacoes || "",
-      relatoriosCount: 0, // Inicializa com 0, será atualizado no refresh
+      relatorios_count: 0, // Inicializa com 0, será atualizado no refresh
       observacoes_count: 0 // Inicializa com 0, será atualizado no refresh
     };
 
@@ -184,7 +163,7 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
       responsavel: alunoAtualizado.responsavel,
       telefone: alunoAtualizado.telefone || "",
       observacoes: alunoAtualizado.observacoes || "",
-      relatoriosCount: editingAluno.relatoriosCount, // Manter os counts existentes
+      relatorios_count: editingAluno.relatorios_count, // Manter os counts existentes
       observacoes_count: editingAluno.observacoes_count // Manter os counts existentes
     };
 
@@ -394,20 +373,20 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-nome">Nome Completo *</Label>
-              <Input
-                id="edit-nome"
-                placeholder="Digite o nome completo"
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-              />
-            </div>
+            <InputField
+              id="edit-nome"
+              label="Nome Completo"
+              type="text"
+              value={formData.nome}
+              onChange={(value) => setFormData({ ...formData, nome: value })}
+              required
+              placeholder="Digite o nome completo"
+            />
             
             <div>
               <Label htmlFor="edit-turma">Turma *</Label>
               <Select value={formData.turmaId} onValueChange={(value) => setFormData({ ...formData, turmaId: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-gray-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -427,44 +406,43 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
                 type="date"
                 value={formData.dataNascimento}
                 onChange={(e) => setFormData({ ...formData, dataNascimento: e.target.value })}
+                className="bg-gray-200"
               />
             </div>
             
-            <div>
-              <Label htmlFor="edit-responsavel">Responsável *</Label>
-              <Input
-                id="edit-responsavel"
-                placeholder="Nome do responsável"
-                value={formData.responsavel}
-                onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
-              />
-            </div>
+            <InputField
+              id="edit-responsavel"
+              label="Responsável"
+              type="text"
+              value={formData.responsavel}
+              onChange={(value) => setFormData({ ...formData, responsavel: value })}
+              required
+              placeholder="Nome do responsável"
+            />
             
-            <div>
-              <Label htmlFor="edit-telefone">Telefone</Label>
-              <Input
-                id="edit-telefone"
-                placeholder="(11) 99999-9999"
-                value={formData.telefone}
-                onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-              />
-            </div>
+            <InputField
+              id="edit-telefone"
+              label="Telefone"
+              type="telefone"
+              value={formData.telefone}
+              onChange={(value) => setFormData({ ...formData, telefone: value })}
+              placeholder="(11) 99999-9999"
+            />
             
-            <div>
-              <Label htmlFor="edit-observacoes">Observações</Label>
-              <Input
-                id="edit-observacoes"
-                placeholder="Observações adicionais"
-                value={formData.observacoes}
-                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-              />
-            </div>
+            <InputField
+              id="edit-observacoes"
+              label="Observações"
+              type="text"
+              value={formData.observacoes}
+              onChange={(value) => setFormData({ ...formData, observacoes: value })}
+              placeholder="Observações adicionais"
+            />
           </div>
           <DialogFooter>
             <Button variant="cancel" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleEdit} className="bg-gradient-primary hover:opacity-90 text-white">
+            <Button onClick={handleEdit} className="bg-amber-500 text-white hover:bg-amber-600">
               Salvar Alterações
             </Button>
           </DialogFooter>
@@ -496,23 +474,23 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
       {/* Alunos Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {alunosFiltrados.map((aluno) => (
-          <Card key={aluno.id} className="bg-white shadow-soft hover:shadow-medium transition-smooth">
+          <Card key={aluno.id} className="bg-white shadow-soft hover:shadow-medium transition-smooth flex flex-col min-h-[300px]"> {/* Added flex flex-col and min-h */}
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
+                <div className="flex items-center gap-3 flex-grow min-w-0 max-w-[calc(100%-80px)]"> {/* Added flex-grow, min-w-0, and max-w */}
+                  <Avatar className="h-12 w-12 flex-shrink-0"> {/* Added flex-shrink-0 */}
                     <AvatarFallback className="bg-gradient-primary text-white text-sm font-semibold">
                       {getInitials(aluno.nome)}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <CardTitle className="text-lg">{aluno.nome}</CardTitle>
+                  <div className="flex-grow min-w-0"> {/* This div already has flex-grow and min-w-0 */}
+                    <CardTitle className="text-lg whitespace-nowrap overflow-hidden text-ellipsis">{aluno.nome}</CardTitle>
                     <CardDescription>{aluno.idade} anos</CardDescription>
                   </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-shrink-0"> {/* Added flex-shrink-0 */}
                   <Button
-                    variant="ghost"
+                    variant="editOutline"
                     size="sm"
                     onClick={() => openEditDialog(aluno)}
                     className="h-8 w-8 p-0"
@@ -520,34 +498,36 @@ const handleAdd = async () => {  // ← ADICIONAR 'async' aqui
                     <Edit2 className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="destructiveOutline"
                     size="sm"
                     onClick={() => handleDelete(aluno)}
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    className="h-8 w-8 p-0"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">
-                  {aluno.turma}
-                </Badge>
+            <CardContent className="flex flex-col justify-between p-4 flex-grow">
+              <div className="flex flex-col gap-2 mb-4"> {/* New div to group top content, added mb-4 */}
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    {aluno.turma}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <FileText className="h-3 w-3" />
+                  <span className="text-xs">{aluno.relatorios_count} relatórios</span>
+                </div>
+                
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <MessageSquare className="h-3 w-3" />
+                  <span className="text-xs">{aluno.observacoes_count || 0} observações</span>
+                </div>
               </div>
               
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <FileText className="h-3 w-3" />
-                <span className="text-xs">{aluno.relatoriosCount} relatórios</span>
-              </div>
-              
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <MessageSquare className="h-3 w-3" />
-                <span className="text-xs">{aluno.observacoes_count || 0} observações</span>
-              </div>
-              
-              <div className="space-y-2 text-xs text-muted-foreground">
+              <div className="space-y-2 text-xs text-muted-foreground flex-grow">
                 <div>
                   <strong>Responsável:</strong> {aluno.responsavel}
                 </div>
